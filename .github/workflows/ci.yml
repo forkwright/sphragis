@@ -1,0 +1,120 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  fmt:
+    name: cargo fmt
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          components: rustfmt
+      - name: cargo fmt check
+        run: cargo fmt --all -- --check
+
+  check:
+    name: cargo check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+      - name: cargo check (default)
+        run: cargo check --all-targets
+      - name: cargo check (preview-pq)
+        run: cargo check --all-targets --features preview-pq
+
+  clippy:
+    name: cargo clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+      - name: clippy (default)
+        run: cargo clippy --all-targets -- -D warnings
+      - name: clippy (preview-pq)
+        run: cargo clippy --all-targets --features preview-pq -- -D warnings
+
+  test:
+    name: cargo test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+      - name: cargo test (default — inert build check)
+        run: cargo test
+      - name: cargo test (preview-pq — KAT + round-trip + negatives)
+        run: cargo test --features preview-pq
+
+  gate-attestation:
+    name: gate-attestation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pass trusted automation PRs
+        if: ${{ github.actor == 'dependabot[bot]' || github.actor == 'release-please[bot]' }}
+        run: echo "Gate attestation waived for trusted automation actor."
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        if: ${{ github.actor != 'dependabot[bot]' && github.actor != 'release-please[bot]' }}
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify Gate-Passed trailer
+        if: ${{ github.actor != 'dependabot[bot]' && github.actor != 'release-please[bot]' }}
+        run: |
+          commits=$(git log --format="%H" "origin/${{ github.base_ref }}..HEAD")
+          if [ -z "$commits" ]; then
+            echo "ERROR: No commits found in PR"
+            exit 1
+          fi
+
+          found=false
+          for sha in $commits; do
+            body=$(git log -1 --format="%b" "$sha")
+            if echo "$body" | grep -q "^Gate-Passed:"; then
+              version=$(echo "$body" | grep "^Gate-Passed:" | head -1)
+              echo "Found gate attestation: $version"
+              found=true
+              break
+            fi
+          done
+
+          if [ "$found" = false ]; then
+            echo "ERROR: No Gate-Passed trailer found in any PR commit."
+            echo "Run the local gate and commit with the trailer."
+            exit 1
+          fi

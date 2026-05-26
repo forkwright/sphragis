@@ -1,0 +1,28 @@
+# archetype: B
+# forge-only: false
+# spdx: AGPL-3.0-only
+
+# Forge CI pipeline for forkwright/sphragis.
+
+[pipeline]
+stages = ["cargo fmt", "cargo check", "cargo clippy", "cargo test", "kanon lint"]
+
+[stages."cargo fmt"]
+cmd = "cargo fmt --all -- --check"
+timeout_secs = 300
+
+[stages."cargo check"]
+cmd = "cargo check --all-targets --features preview-pq"
+timeout_secs = 600
+
+[stages."cargo clippy"]
+cmd = "cargo clippy --all-targets --features preview-pq -- -D warnings"
+timeout_secs = 600
+
+[stages."cargo test"]
+cmd = "cargo test --features preview-pq"
+timeout_secs = 600
+
+[stages."kanon lint"]
+cmd = "kanon lint . --summary"
+timeout_secs = 300

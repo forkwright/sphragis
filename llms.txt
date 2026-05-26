@@ -1,0 +1,17 @@
+# sphragis
+
+> σφραγίς — post-quantum hybrid sealing (X-Wing KEM + ChaCha20-Poly1305 envelope)
+
+Standalone fleet crate for multi-device content-key sealing. All cryptography
+is behind the `preview-pq` feature (unaudited).
+
+## Key files
+
+- `src/lib.rs` — public API, `SEAL_VERSION_V1`, `WRAP_DOMAIN_V1`
+- `src/hybrid.rs` — X-Wing KEM implementation
+- `src/envelope.rs` — HKDF-SHA256 + ChaCha20-Poly1305 envelope
+- `src/seal.rs` — `seal_for` / `unseal` multi-recipient API, `WrappedContentKey`
+- `src/error.rs` — `SealError`
+- `tests/known_answer_vectors.rs` — X-Wing KAT + RFC KATs + round-trip + negatives
+- `DECISION.md` — full design rationale
+- `Cargo.toml` — dependency versions (ml-kem 0.3.2, x25519-dalek 2.0.1, etc.)

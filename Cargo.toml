@@ -1,0 +1,67 @@
+[package]
+name = "sphragis"
+description = "σφραγίς — post-quantum hybrid sealing (X-Wing KEM + ChaCha20-Poly1305 envelope)"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "AGPL-3.0-only"
+repository = "https://github.com/forkwright/sphragis"
+documentation = "https://docs.rs/sphragis"
+keywords = ["cryptography", "post-quantum", "x-wing", "ml-kem", "hybrid-kem"]
+categories = ["cryptography", "no-std"]
+readme = "README.md"
+
+[dependencies]
+snafu = "0.8"
+zeroize = { version = "1", features = ["derive"] }
+subtle = "2"
+blake3 = "1"
+serde = { version = "1", features = ["derive"] }
+ciborium = "0.2"
+
+# Post-quantum hybrid KEM stack (preview-pq only).
+# WHY: released RustCrypto primitives, not the rc-pinned `x-wing` aggregate crate.
+ml-kem = { version = "0.3.2", features = ["hazmat", "zeroize"], optional = true }
+x25519-dalek = { version = "2.0.1", features = ["static_secrets", "zeroize"], optional = true }
+sha3 = { version = "0.10", optional = true }
+sha2 = { version = "0.10", optional = true }
+hkdf = { version = "0.12", optional = true }
+chacha20poly1305 = { version = "0.10", optional = true }
+rand_core = { version = "0.6", features = ["getrandom"], optional = true }
+
+[dev-dependencies]
+hex-literal = "0.4"
+hkdf = { version = "0.12" }
+sha2 = { version = "0.10" }
+x25519-dalek = { version = "2.0.1", features = ["static_secrets"] }
+
+[features]
+default = []
+# WHY: unaudited hybrid post-quantum cryptography. Never in the default binary
+# path. Gated until cryptographic review per akroasis#131 done-criterion 6.
+preview-pq = [
+    "dep:ml-kem",
+    "dep:x25519-dalek",
+    "dep:sha3",
+    "dep:sha2",
+    "dep:hkdf",
+    "dep:chacha20poly1305",
+    "dep:rand_core",
+]
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+indexing_slicing = "warn"
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+cast_possible_truncation = "allow"
+cast_precision_loss = "allow"
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+redundant_pub_crate = "allow"
