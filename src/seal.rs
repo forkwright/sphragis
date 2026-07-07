@@ -5,11 +5,12 @@
 //! recipients only.
 
 use serde::{Deserialize, Serialize};
+use snafu::ensure;
 use zeroize::Zeroizing;
 
-use crate::envelope::{derive_wrap_key, open, seal, NONCE_LEN};
-use crate::error::SealError;
-use crate::hybrid::{DecapsulationKey, EncapsulationKey};
+use crate::envelope::{derive_wrap_key, open, seal, NONCE_LEN, TAG_LEN};
+use crate::error::{SealError, UnsupportedVersionSnafu, WrongLengthSnafu};
+use crate::hybrid::{DecapsulationKey, EncapsulationKey, CIPHERTEXT_LEN};
 use crate::{SEAL_VERSION_V1, WRAP_DOMAIN_V1};
 
 use rand_core::{OsRng, RngCore};
@@ -80,15 +81,48 @@ impl WrappedContentKey {
         Ok(buf)
     }
 
-    /// Decodes from CBOR.
+    /// Decodes from CBOR and validates the v1 wire shape.
     ///
     /// # Errors
     ///
-    /// Returns [`SealError::Serialization`] on decoding failure.
+    /// Returns [`SealError::Serialization`] on decoding failure,
+    /// [`SealError::UnsupportedVersion`] for an unknown version byte, or
+    /// [`SealError::WrongLength`] if a variable-length field does not match
+    /// the v1 construction.
     pub fn from_cbor(bytes: &[u8]) -> Result<Self, SealError> {
-        ciborium::from_reader(bytes).map_err(|e| SealError::Serialization {
+        let wck: Self = ciborium::from_reader(bytes).map_err(|e| SealError::Serialization {
             reason: e.to_string(),
-        })
+        })?;
+        wck.validate()?;
+        Ok(wck)
+    }
+
+    // WHY: parse-boundary validation — untrusted CBOR must not hand unbounded
+    // or malformed field lengths to the downstream KEM/AEAD paths.
+    fn validate(&self) -> Result<(), SealError> {
+        ensure!(
+            self.version == SEAL_VERSION_V1,
+            UnsupportedVersionSnafu {
+                version: self.version,
+            }
+        );
+        ensure!(
+            self.kem_ciphertext.len() == CIPHERTEXT_LEN,
+            WrongLengthSnafu {
+                what: "kem ciphertext",
+                expected: CIPHERTEXT_LEN,
+                actual: self.kem_ciphertext.len(),
+            }
+        );
+        ensure!(
+            self.sealed_key.len() == CONTENT_KEY_LEN + TAG_LEN,
+            WrongLengthSnafu {
+                what: "sealed content key",
+                expected: CONTENT_KEY_LEN + TAG_LEN,
+                actual: self.sealed_key.len(),
+            }
+        );
+        Ok(())
     }
 
     /// Associated data bound into the AEAD: `version || recipient_id`.
@@ -107,7 +141,8 @@ impl WrappedContentKey {
 ///
 /// # Errors
 ///
-/// Returns a [`SealError`] if HKDF or the AEAD seal fails for any recipient.
+/// Returns a [`SealError`] if encapsulation, HKDF, or the AEAD seal fails for
+/// any recipient.
 pub fn seal_for(
     content_key: &[u8; CONTENT_KEY_LEN],
     recipients: &[EncapsulationKey],
@@ -115,7 +150,7 @@ pub fn seal_for(
     let mut out = Vec::with_capacity(recipients.len());
     for ek in recipients {
         let recipient_id = RecipientId::of(ek);
-        let (kem_ciphertext, ss) = ek.encapsulate();
+        let (kem_ciphertext, ss) = ek.encapsulate()?;
 
         let wrap_key = derive_wrap_key(ss.as_slice(), WRAP_DOMAIN_V1)?;
 

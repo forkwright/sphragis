@@ -14,7 +14,6 @@ readme = "README.md"
 [dependencies]
 snafu = "0.8"
 zeroize = { version = "1", features = ["derive"] }
-subtle = "2"
 blake3 = "1"
 serde = { version = "1", features = ["derive"] }
 ciborium = "0.2"
@@ -23,7 +22,9 @@ ciborium = "0.2"
 # WHY: released RustCrypto primitives, not the rc-pinned `x-wing` aggregate crate.
 ml-kem = { version = "0.3.2", features = ["hazmat", "zeroize"], optional = true }
 x25519-dalek = { version = "2.0.1", features = ["static_secrets", "zeroize"], optional = true }
-sha3 = { version = "0.10", optional = true }
+# WHY: sha3 0.11 (ml-kem's own digest generation) — its `zeroize` feature wipes
+# hasher + XOF-reader state on drop; 0.10 offers no digest-state zeroization.
+sha3 = { version = "0.11", features = ["zeroize"], optional = true }
 sha2 = { version = "0.10", optional = true }
 hkdf = { version = "0.12", optional = true }
 chacha20poly1305 = { version = "0.10", optional = true }

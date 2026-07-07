@@ -14,6 +14,8 @@ use crate::error::SealError;
 
 /// AEAD nonce length (ChaCha20-Poly1305).
 pub const NONCE_LEN: usize = 12;
+/// AEAD authentication-tag length (Poly1305).
+pub const TAG_LEN: usize = 16;
 /// Wrapping-key length derived from HKDF.
 pub const WRAP_KEY_LEN: usize = 32;
 

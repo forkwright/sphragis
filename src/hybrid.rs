@@ -76,13 +76,12 @@ impl core::fmt::Debug for DecapsulationKey {
 
 impl HybridKem {
     /// Generates a fresh X-Wing keypair using the OS CSPRNG.
+    // WHY: the seed is born inside Zeroizing so no bare stack copy ever exists.
     #[must_use]
     pub fn generate() -> (DecapsulationKey, EncapsulationKey) {
-        let mut seed = [0u8; DECAPSULATION_KEY_LEN];
-        OsRng.fill_bytes(&mut seed);
-        let dk = DecapsulationKey {
-            seed: Zeroizing::new(seed),
-        };
+        let mut seed = Zeroizing::new([0u8; DECAPSULATION_KEY_LEN]);
+        OsRng.fill_bytes(seed.as_mut_slice());
+        let dk = DecapsulationKey { seed };
         let ek = dk.encapsulation_key();
         (dk, ek)
     }
@@ -90,17 +89,21 @@ impl HybridKem {
 
 impl DecapsulationKey {
     /// Reconstructs a decapsulation key from its 32-byte seed.
+    // WHY: the parameter is a Copy array; the caller's binding is out of reach,
+    // but the residual copy in this frame is wiped before returning.
     #[must_use]
-    pub fn from_seed(seed: [u8; DECAPSULATION_KEY_LEN]) -> Self {
-        Self {
+    pub fn from_seed(mut seed: [u8; DECAPSULATION_KEY_LEN]) -> Self {
+        let dk = Self {
             seed: Zeroizing::new(seed),
-        }
+        };
+        seed.zeroize();
+        dk
     }
 
-    /// Returns the 32-byte seed. Caller must zeroize.
+    /// Returns the 32-byte seed, zeroized on drop.
     #[must_use]
-    pub fn to_seed(&self) -> [u8; DECAPSULATION_KEY_LEN] {
-        *self.seed
+    pub fn to_seed(&self) -> Zeroizing<[u8; DECAPSULATION_KEY_LEN]> {
+        self.seed.clone()
     }
 
     /// Derives the matching public encapsulation key.
@@ -132,17 +135,19 @@ impl DecapsulationKey {
         );
         let (ct_m_bytes, ct_x_bytes) = ct.split_at(ML_KEM_CT_LEN);
 
-        let (dk_m, sk_x) = expand(&self.seed);
-        let pk_x = XPublic::from(&sk_x);
-
+        // WHY: all fallible parsing precedes decapsulation so no early return
+        // can exist while a shared secret is live on the stack.
         let ct_m: MlKemCiphertext<MlKem768> =
             Array::try_from(ct_m_bytes).map_err(|_| SealError::InvalidMlKem {
                 reason: "ciphertext length".into(),
             })?;
-        // ML-KEM decapsulation is infallible (implicit rejection on bad ct).
-        let ss_m = dk_m.decapsulate(&ct_m);
-
         let ct_x = x_public_from_slice(ct_x_bytes)?;
+
+        let (dk_m, sk_x) = expand(&self.seed);
+        let pk_x = XPublic::from(&sk_x);
+
+        // ML-KEM decapsulation is infallible (implicit rejection on bad ct).
+        let ss_m = Zeroizing::new(dk_m.decapsulate(&ct_m));
         let ss_x = sk_x.diffie_hellman(&ct_x);
 
         Ok(combine(
@@ -158,27 +163,47 @@ impl EncapsulationKey {
     /// Encapsulates to this public key, returning `(ciphertext, shared_secret)`.
     ///
     /// Uses the OS CSPRNG. Ciphertext wire form is `ML-KEM ct || X25519 ct`.
-    #[must_use]
-    pub fn encapsulate(&self) -> (Vec<u8>, SharedSecret) {
-        let mut rnd = [0u8; 64];
-        OsRng.fill_bytes(&mut rnd);
-        let out = self.encapsulate_deterministic(&rnd);
-        rnd.zeroize();
-        out
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SealError::WrongLength`] if the ML-KEM message seed cannot be
+    /// formed from the sampled randomness (unreachable for a well-formed
+    /// 64-byte buffer; propagated rather than silently defaulted).
+    pub fn encapsulate(&self) -> Result<(Vec<u8>, SharedSecret), SealError> {
+        let mut rnd = Zeroizing::new([0u8; 64]);
+        OsRng.fill_bytes(rnd.as_mut_slice());
+        self.encapsulate_deterministic(&rnd)
     }
 
     /// Deterministic encapsulation from 64 bytes of randomness (first 32 → ML-KEM
     /// message, last 32 → X25519 ephemeral). For known-answer testing only.
     ///
     /// WARNING: never call with non-uniform or reused randomness.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SealError::WrongLength`] if the ML-KEM message seed cannot be
+    /// formed from `randomness` (unreachable for a `[u8; 64]` input; propagated
+    /// per the crate's no-silent-fallback discipline).
     // WHY: ss_m/ss_x/ct_x/pk_x mirror the X-Wing spec notation (see `decapsulate`).
     #[doc(hidden)]
-    #[must_use]
     #[allow(clippy::similar_names)]
-    pub fn encapsulate_deterministic(&self, randomness: &[u8; 64]) -> (Vec<u8>, SharedSecret) {
-        let m: B32 = Array::try_from(&randomness[0..32]).unwrap_or_default();
+    pub fn encapsulate_deterministic(
+        &self,
+        randomness: &[u8; 64],
+    ) -> Result<(Vec<u8>, SharedSecret), SealError> {
+        let m_bytes = &randomness[0..32];
+        let m: Zeroizing<B32> =
+            Zeroizing::new(
+                Array::try_from(m_bytes).map_err(|_| SealError::WrongLength {
+                    what: "ml-kem message seed",
+                    expected: 32,
+                    actual: m_bytes.len(),
+                })?,
+            );
         // ML-KEM deterministic encapsulation is infallible.
         let (ct_m, ss_m) = self.ek_m.encapsulate_deterministic(&m);
+        let ss_m = Zeroizing::new(ss_m);
 
         let mut eph = [0u8; 32];
         eph.copy_from_slice(&randomness[32..64]);
@@ -197,7 +222,7 @@ impl EncapsulationKey {
         let mut ct = Vec::with_capacity(CIPHERTEXT_LEN);
         ct.extend_from_slice(ct_m.as_slice());
         ct.extend_from_slice(ct_x.as_bytes());
-        (ct, ss)
+        Ok((ct, ss))
     }
 
     /// Serializes to `ML-KEM ek (1184) || X25519 pk (32)`.
@@ -239,21 +264,24 @@ impl EncapsulationKey {
 /// Expands the 32-byte X-Wing seed into the ML-KEM decapsulation key and X25519
 /// secret via SHAKE-256 (per the X-Wing spec): 64 bytes → ML-KEM seed,
 /// 32 bytes → X25519 secret scalar.
+// NOTE: hasher + XOF-reader state absorb seed-derived material; sha3's
+// `zeroize` feature wipes both on drop.
 fn expand(seed: &[u8; DECAPSULATION_KEY_LEN]) -> (MlKemDk, XSecret) {
     let mut shaker = Shake256::default();
     shaker.update(seed);
     let mut xof = shaker.finalize_xof();
 
-    let mut mlkem_seed = [0u8; 64];
-    xof.read(&mut mlkem_seed);
-    let seed_arr: Seed = Array::from(mlkem_seed);
-    let dk_m = MlKemDk::from_seed(seed_arr);
+    // WHY: the XOF writes directly into a Zeroizing buffer; the only bare copy
+    // is the rvalue moved into `from_seed` (ml-kem's `zeroize` feature owns it
+    // from there).
+    let mut mlkem_seed: Zeroizing<Seed> = Zeroizing::new(Array::default());
+    xof.read(mlkem_seed.as_mut_slice());
+    let dk_m = MlKemDk::from_seed(Seed::clone(&mlkem_seed));
 
     let mut x_sk = [0u8; 32];
     xof.read(&mut x_sk);
     let sk_x = XSecret::from(x_sk);
     x_sk.zeroize();
-    mlkem_seed.zeroize();
 
     (dk_m, sk_x)
 }

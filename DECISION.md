@@ -148,11 +148,16 @@ workspace at PR #173 per operator direction).
 |---|---|---|
 | `ml-kem` | 0.3.2 | FIPS-203 ML-KEM-768 (RustCrypto) |
 | `x25519-dalek` | 2.0.1 | X25519 (already a workspace dep) |
-| `sha3` | 0.10 | SHA3-256 combiner + SHAKE-256 seed expansion |
+| `sha3` | 0.11 | SHA3-256 combiner + SHAKE-256 seed expansion (`zeroize` feature wipes digest/XOF state on drop; same digest generation as `ml-kem`) |
 | `sha2` | 0.10 | HKDF-SHA256 hash |
-| `hkdf` | 0.12 | RFC 5869 extract/expand (digest 0.10 generation — coherent with `sha2`/`sha3` 0.10; hkdf 0.13 requires sha2 0.11 and is incompatible) |
+| `hkdf` | 0.12 | RFC 5869 extract/expand (digest 0.10 generation — coherent with `sha2` 0.10; hkdf 0.13 requires sha2 0.11 and is incompatible) |
 | `chacha20poly1305` | 0.10 | envelope AEAD (already a workspace dep) |
-| `zeroize`, `subtle`, `blake3`, `ciborium`, `snafu` | workspace | hygiene/serde/errors |
+| `zeroize`, `blake3`, `ciborium`, `snafu` | workspace | hygiene/serde/errors |
+
+No direct `subtle` dependency: the crate compares only public values
+(`RecipientId` is the BLAKE3 hash of a public encapsulation key, carried in
+plaintext on the wire). The one secret-dependent comparison — the Poly1305 tag
+check — happens inside `chacha20poly1305`, which uses `subtle` internally.
 
 Deliberately NOT the `x-wing` crate (0.1.0-rc.0): it pins a *release-candidate*
 stack (`ml-kem 0.3.0-rc.0`, `x25519-dalek 3.0.0-pre.6`, `sha3 0.11.0-rc.7`) and
