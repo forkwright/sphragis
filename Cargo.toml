@@ -11,31 +11,6 @@ keywords = ["cryptography", "post-quantum", "x-wing", "ml-kem", "hybrid-kem"]
 categories = ["cryptography", "no-std"]
 readme = "README.md"
 
-[dependencies]
-snafu = "0.8"
-zeroize = { version = "1", features = ["derive"] }
-blake3 = "1"
-serde = { version = "1", features = ["derive"] }
-ciborium = "0.2"
-
-# Post-quantum hybrid KEM stack (preview-pq only).
-# WHY: released RustCrypto primitives, not the rc-pinned `x-wing` aggregate crate.
-ml-kem = { version = "0.3.2", features = ["hazmat", "zeroize"], optional = true }
-x25519-dalek = { version = "2.0.1", features = ["static_secrets", "zeroize"], optional = true }
-# WHY: sha3 0.11 (ml-kem's own digest generation) — its `zeroize` feature wipes
-# hasher + XOF-reader state on drop; 0.10 offers no digest-state zeroization.
-sha3 = { version = "0.11", features = ["zeroize"], optional = true }
-sha2 = { version = "0.10", optional = true }
-hkdf = { version = "0.12", optional = true }
-chacha20poly1305 = { version = "0.10", optional = true }
-rand_core = { version = "0.6", features = ["getrandom"], optional = true }
-
-[dev-dependencies]
-hex-literal = "0.4"
-hkdf = { version = "0.12" }
-sha2 = { version = "0.10" }
-x25519-dalek = { version = "2.0.1", features = ["static_secrets"] }
-
 [features]
 default = []
 # WHY: unaudited hybrid post-quantum cryptography. Never in the default binary
@@ -49,6 +24,38 @@ preview-pq = [
     "dep:chacha20poly1305",
     "dep:rand_core",
 ]
+
+[dependencies]
+snafu = "0.8"
+zeroize = { version = "1", features = ["derive"] }
+blake3 = "1"
+serde = { version = "1", features = ["derive"] }
+ciborium = "0.2"
+# WHY: sha3 0.11 (ml-kem's own digest generation) — its `zeroize` feature wipes
+# hasher + XOF-reader state on drop; 0.10 offers no digest-state zeroization.
+sha3 = { version = "0.11", features = ["zeroize"], optional = true }
+sha2 = { version = "0.10", optional = true }
+hkdf = { version = "0.12", optional = true }
+chacha20poly1305 = { version = "0.10", optional = true }
+rand_core = { version = "0.6", features = ["getrandom"], optional = true }
+
+# Post-quantum hybrid KEM stack (preview-pq only).
+# WHY: released RustCrypto primitives, not the rc-pinned `x-wing` aggregate crate.
+[dependencies.ml-kem]
+version = "0.3.2"
+features = ["hazmat", "zeroize"]
+optional = true
+
+[dependencies.x25519-dalek]
+version = "2.0.1"
+features = ["static_secrets", "zeroize"]
+optional = true
+
+[dev-dependencies]
+hex-literal = "0.4"
+hkdf = { version = "0.12" }
+sha2 = { version = "0.10" }
+x25519-dalek = { version = "2.0.1", features = ["static_secrets"] }
 
 [lints.rust]
 unsafe_code = "forbid"

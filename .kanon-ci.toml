@@ -12,15 +12,15 @@ cmd = "cargo fmt --all -- --check"
 timeout_secs = 300
 
 [stages."cargo check"]
-cmd = "cargo check --all-targets --features preview-pq"
+cmd = "cargo check --all-targets --features preview-pq --jobs 8"
 timeout_secs = 600
 
 [stages."cargo clippy"]
-cmd = "cargo clippy --all-targets --features preview-pq -- -D warnings"
+cmd = "cargo clippy --all-targets --features preview-pq --jobs 8 -- -D warnings"
 timeout_secs = 600
 
 [stages."cargo test"]
-cmd = "cargo test --features preview-pq"
+cmd = "cargo test --features preview-pq --jobs 8 -- --test-threads 8"
 timeout_secs = 600
 
 [stages."kanon lint"]

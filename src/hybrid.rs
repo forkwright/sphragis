@@ -32,16 +32,16 @@ const ML_KEM_EK_LEN: usize = 1184;
 const X25519_LEN: usize = 32;
 
 /// X-Wing encapsulation-key (public) length: ML-KEM ek || X25519 pk.
-pub const ENCAPSULATION_KEY_LEN: usize = ML_KEM_EK_LEN + X25519_LEN;
+pub const ENCAPSULATION_KEY_LEN: usize = ML_KEM_EK_LEN + X25519_LEN; // kanon:ignore RUST/pub-visibility -- public wire-shape constant (KAT gate consumes it)
 /// X-Wing ciphertext length: ML-KEM ct || X25519 ct.
-pub const CIPHERTEXT_LEN: usize = ML_KEM_CT_LEN + X25519_LEN;
+pub const CIPHERTEXT_LEN: usize = ML_KEM_CT_LEN + X25519_LEN; // kanon:ignore RUST/pub-visibility -- public wire-shape constant (KAT gate consumes it)
 /// X-Wing decapsulation-key (private) seed length.
-pub const DECAPSULATION_KEY_LEN: usize = 32;
+pub const DECAPSULATION_KEY_LEN: usize = 32; // kanon:ignore RUST/pub-visibility -- public constant in from_seed/to_seed signatures
 /// Hybrid shared-secret length.
-pub const SHARED_SECRET_LEN: usize = 32;
+pub const SHARED_SECRET_LEN: usize = 32; // kanon:ignore RUST/pub-visibility -- public constant in the SharedSecret alias
 
 /// A hybrid shared secret. Zeroized on drop.
-pub type SharedSecret = Zeroizing<[u8; SHARED_SECRET_LEN]>;
+pub type SharedSecret = Zeroizing<[u8; SHARED_SECRET_LEN]>; // kanon:ignore RUST/pub-visibility -- re-exported in lib.rs
 
 type MlKemDk = ml_kem::DecapsulationKey<MlKem768>;
 type MlKemEk = ml_kem::EncapsulationKey<MlKem768>;
@@ -64,6 +64,7 @@ pub struct EncapsulationKey {
 ///
 /// Stored as the 32-byte X-Wing seed; the ML-KEM decapsulation key and X25519
 /// secret are expanded deterministically. Zeroized on drop.
+// kanon:ignore RUST/pub-visibility -- re-exported in lib.rs; no derive (manual REDACTED Debug), so the derive skip cannot engage
 pub struct DecapsulationKey {
     seed: Zeroizing<[u8; DECAPSULATION_KEY_LEN]>,
 }
@@ -121,9 +122,10 @@ impl DecapsulationKey {
     ///
     /// Returns [`SealError::WrongLength`] if the ciphertext is malformed, or
     /// [`SealError::InvalidMlKem`] if the ML-KEM component is rejected.
-    // WHY: ss_m/ss_x/ct_x/sk_x/pk_x mirror the X-Wing spec notation; spec-faithful
-    // names beat clippy's similar_names heuristic here (upstream does the same).
-    #[allow(clippy::similar_names)]
+    #[expect(
+        clippy::similar_names,
+        reason = "ss_m/ss_x/ct_x/sk_x/pk_x mirror the X-Wing spec notation; spec-faithful names beat the similar_names heuristic (upstream does the same)"
+    )]
     pub fn decapsulate(&self, ct: &[u8]) -> Result<SharedSecret, SealError> {
         ensure!(
             ct.len() == CIPHERTEXT_LEN,
@@ -185,14 +187,12 @@ impl EncapsulationKey {
     /// Returns [`SealError::WrongLength`] if the ML-KEM message seed cannot be
     /// formed from `randomness` (unreachable for a `[u8; 64]` input; propagated
     /// per the crate's no-silent-fallback discipline).
-    // WHY: ss_m/ss_x/ct_x/pk_x mirror the X-Wing spec notation (see `decapsulate`).
     #[doc(hidden)]
-    #[allow(clippy::similar_names)]
     pub fn encapsulate_deterministic(
         &self,
         randomness: &[u8; 64],
     ) -> Result<(Vec<u8>, SharedSecret), SealError> {
-        let m_bytes = &randomness[0..32];
+        let (m_bytes, x_bytes) = randomness.split_at(32);
         let m: Zeroizing<B32> =
             Zeroizing::new(
                 Array::try_from(m_bytes).map_err(|_| SealError::WrongLength {
@@ -205,8 +205,11 @@ impl EncapsulationKey {
         let (ct_m, ss_m) = self.ek_m.encapsulate_deterministic(&m);
         let ss_m = Zeroizing::new(ss_m);
 
-        let mut eph = [0u8; 32];
-        eph.copy_from_slice(&randomness[32..64]);
+        let mut eph: [u8; 32] = x_bytes.try_into().map_err(|_| SealError::WrongLength {
+            what: "x25519 ephemeral seed",
+            expected: 32,
+            actual: x_bytes.len(),
+        })?;
         let eph_x = XSecret::from(eph);
         eph.zeroize();
         let ct_x = XPublic::from(&eph_x);

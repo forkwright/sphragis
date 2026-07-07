@@ -4,6 +4,7 @@
 //! means re-sealing the (optionally rotated) content key for the remaining
 //! recipients only.
 
+use rand_core::{OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 use snafu::ensure;
 use zeroize::Zeroizing;
@@ -13,10 +14,8 @@ use crate::error::{SealError, UnsupportedVersionSnafu, WrongLengthSnafu};
 use crate::hybrid::{DecapsulationKey, EncapsulationKey, CIPHERTEXT_LEN};
 use crate::{SEAL_VERSION_V1, WRAP_DOMAIN_V1};
 
-use rand_core::{OsRng, RngCore};
-
 /// Content-key length (the symmetric key the consuming store uses for payloads).
-pub const CONTENT_KEY_LEN: usize = 32;
+pub const CONTENT_KEY_LEN: usize = 32; // kanon:ignore RUST/pub-visibility -- re-exported in lib.rs
 
 /// A recipient identifier: BLAKE3 of the recipient's X-Wing encapsulation key.
 ///
@@ -126,10 +125,13 @@ impl WrappedContentKey {
     }
 
     /// Associated data bound into the AEAD: `version || recipient_id`.
-    fn aad(&self) -> [u8; 1 + 32] {
-        let mut aad = [0u8; 33];
-        aad[0] = self.version;
-        aad[1..].copy_from_slice(&self.recipient_id.0);
+    // INVARIANT: the irrefutable array destructure splits the fixed-size
+    // buffer at compile time - no runtime bounds check can fail.
+    const fn aad(&self) -> [u8; 1 + 32] {
+        let mut aad = [0u8; 1 + 32];
+        let [version_byte, recipient_bytes @ ..] = &mut aad; // kanon:ignore RUST/indexing-slicing -- irrefutable pattern, not an index: destructures the fixed [u8; 33] at compile time
+        *version_byte = self.version;
+        *recipient_bytes = self.recipient_id.0;
         aad
     }
 }
@@ -143,6 +145,7 @@ impl WrappedContentKey {
 ///
 /// Returns a [`SealError`] if encapsulation, HKDF, or the AEAD seal fails for
 /// any recipient.
+// kanon:ignore RUST/pub-visibility -- re-exported in lib.rs
 pub fn seal_for(
     content_key: &[u8; CONTENT_KEY_LEN],
     recipients: &[EncapsulationKey],
@@ -177,6 +180,7 @@ pub fn seal_for(
 /// Returns [`SealError::UnsupportedVersion`] for an unknown version,
 /// [`SealError::AeadOpen`] for the wrong recipient / tampered ciphertext, or a
 /// KEM error for a corrupted ciphertext.
+// kanon:ignore RUST/pub-visibility -- re-exported in lib.rs
 pub fn unseal(
     dk: &DecapsulationKey,
     wck: &WrappedContentKey,

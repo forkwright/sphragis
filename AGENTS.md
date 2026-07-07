@@ -1,3 +1,9 @@
+<!--
+scope: sphragis repo navigation for coding agents
+defers_to: CLAUDE.md for project conventions
+tightens: none
+-->
+
 # AGENTS.md
 
 Agent navigation index for `sphragis`.
@@ -27,7 +33,7 @@ Unaudited preview. All crypto behind `preview-pq`. First consumer: akroasis
   (changed from the akroasis-internal `akroasis-sphragis-ck-wrap-v1` on extraction).
   akroasis consumer must use this tag; any sealed data from the in-akroasis crate
   is NOT forward-compatible with this standalone version.
-- `similar_names` clippy allow on `decapsulate` + `encapsulate_deterministic`:
+- `similar_names` clippy `#[expect]` on `decapsulate` + `encapsulate_deterministic`:
   ss_m/ss_x/ct_x/pk_x mirror X-Wing spec notation; suppression is intentional.
 - ML-KEM 0.3.2 pulls `rand_core 0.10` transitively; x25519-dalek 2.0.1 uses
   `rand_core 0.6` at call sites. The two majors coexist.

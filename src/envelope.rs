@@ -13,11 +13,11 @@ use zeroize::Zeroizing;
 use crate::error::SealError;
 
 /// AEAD nonce length (ChaCha20-Poly1305).
-pub const NONCE_LEN: usize = 12;
+pub const NONCE_LEN: usize = 12; // kanon:ignore RUST/pub-visibility -- public wire-shape constant (typed into WrappedContentKey)
 /// AEAD authentication-tag length (Poly1305).
-pub const TAG_LEN: usize = 16;
+pub const TAG_LEN: usize = 16; // kanon:ignore RUST/pub-visibility -- public wire-shape constant (sealed_key length validation)
 /// Wrapping-key length derived from HKDF.
-pub const WRAP_KEY_LEN: usize = 32;
+pub const WRAP_KEY_LEN: usize = 32; // kanon:ignore RUST/pub-visibility -- public constant in derive_wrap_key's signature
 
 /// Derives the 32-byte wrapping key from a hybrid shared secret.
 ///
@@ -29,6 +29,7 @@ pub const WRAP_KEY_LEN: usize = 32;
 ///
 /// Returns [`SealError::HkdfExpand`] if expansion fails (cannot occur for a
 /// 32-byte output, but surfaced rather than panicking).
+// kanon:ignore RUST/pub-visibility -- public API: the RFC 5869 KAT gate consumes it externally
 pub fn derive_wrap_key(
     shared_secret: &[u8],
     domain: &[u8],
@@ -47,7 +48,7 @@ pub fn derive_wrap_key(
 /// # Errors
 ///
 /// Returns [`SealError::AeadSeal`] if the AEAD operation fails.
-pub fn seal(
+pub(crate) fn seal(
     wrap_key: &[u8; WRAP_KEY_LEN],
     nonce: &[u8; NONCE_LEN],
     content_key: &[u8],
@@ -71,7 +72,7 @@ pub fn seal(
 ///
 /// Returns [`SealError::AeadOpen`] on a wrong key, wrong recipient, tampered
 /// ciphertext, or wrong associated data.
-pub fn open(
+pub(crate) fn open(
     wrap_key: &[u8; WRAP_KEY_LEN],
     nonce: &[u8; NONCE_LEN],
     sealed: &[u8],

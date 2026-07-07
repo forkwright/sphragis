@@ -53,7 +53,7 @@ coverage, parse-boundary validation, dependency hygiene, test coverage.
 
 ## [0.1.0] — initial extraction
 
-Extracted from `forkwright/akroasis` workspace crate `crates/sphragis` (PR #173,
+Origin: `forkwright/akroasis` workspace crate `crates/sphragis` (PR #173,
 commit `9d7ef5f`). Design unchanged; relocated to standalone fleet repo so
 consumers outside akroasis can depend on it without a workspace dependency.
 

@@ -14,8 +14,8 @@ Scope: fleet-wide capability; first consumer akroasis (`pinax` reference store +
 - Envelope: **HKDF-SHA256 (null salt)** expands the X-Wing shared secret with a
   versioned domain tag, then **ChaCha20-Poly1305** seals the 32-byte content key.
 - Wire format: versioned, per-recipient `WrappedContentKey` (CBOR).
-- Home: **standalone fleet repo `forkwright/sphragis`** — extracted from the akroasis
-  workspace at PR #173 per operator direction.
+- Home: **standalone fleet repo `forkwright/sphragis`** (origin: the akroasis
+  workspace, akroasis PR #173).
 - Gate: X-Wing draft KAT + RFC 5869 + RFC 8439 + RFC 7748 + FIPS-203 ACVP, behind
   `preview-pq`. Unaudited until cryptographic review.
 
@@ -130,8 +130,8 @@ Crypto-agility / versioning:
 
 ## 5. Where it lives
 
-**Standalone fleet repo: `forkwright/sphragis`** (extracted from the akroasis
-workspace at PR #173 per operator direction).
+**Standalone fleet repo: `forkwright/sphragis`** (origin: the akroasis
+workspace, akroasis PR #173).
 
 - Not folded into `kryphos`: kryphos is "credential vault + installation
   identity" (passphrase-derived symmetric vault key). Multi-recipient hybrid

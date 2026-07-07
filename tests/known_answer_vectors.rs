@@ -13,7 +13,11 @@
 //! the *hybrid composition* and *envelope*.
 
 #![cfg(feature = "preview-pq")]
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
+#![expect(
+    clippy::unwrap_used,
+    clippy::indexing_slicing,
+    reason = "KAT harness: inputs are fixed known-answer vectors; a failed unwrap or out-of-bounds index IS the test failure"
+)]
 
 use hex_literal::hex;
 
