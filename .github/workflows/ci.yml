@@ -1,3 +1,6 @@
+# NOTE: the dependency audit (cargo deny + cargo audit + osv-scanner) runs in
+# security.yml per-PR and daily; duplicating it here would double CI spend on
+# required checks.
 name: CI
 
 on:

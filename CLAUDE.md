@@ -1,6 +1,7 @@
 <!--
 scope: sphragis repo conventions
 defers_to: ~/.claude/CLAUDE.md for operator principles
+tightens: none
 -->
 
 # CLAUDE.md
@@ -9,21 +10,20 @@ Project conventions for AI coding agents working on this codebase.
 
 ## What this is
 
-A standalone fleet crate extracted from akroasis. Provides X-Wing hybrid KEM
-(X25519 + ML-KEM-768) + HKDF-SHA256 + ChaCha20-Poly1305 envelope for
-multi-device content-key sealing. All crypto is behind `preview-pq` and unaudited.
+A standalone fleet crate providing the X-Wing hybrid KEM (X25519 + ML-KEM-768)
+plus an HKDF-SHA256 + ChaCha20-Poly1305 envelope for multi-device content-key
+sealing. All crypto is behind `preview-pq` and unaudited.
 
 ## Standards
 
-Universal: `~/theke/dev/kanon/standards/STANDARDS.md`
+Universal: `crates/basanos/standards/STANDARDS.md` in `forkwright/kanon`
 
 ## Key patterns
 
 - **Errors:** `snafu` with `.context()` propagation
 - **Zeroize:** all key material is `Zeroizing<>` or `ZeroizeOnDrop`
 - **Features:** `preview-pq` gates all crypto; default build is inert
-- **Lints:** `#[expect(lint, reason = "...")]` over `#[allow]` except the
-  two `similar_names` X-Wing spec sites (spec-faithful notation; documented)
+- **Lints:** `#[expect(lint, reason = "...")]` over `#[allow]`, always
 - **Visibility:** `pub(crate)` by default
 
 ## Testing

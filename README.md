@@ -1,6 +1,6 @@
 # sphragis
 
-*σφραγίς — seal / signet*
+*σφραγίς - seal / signet*
 
 Post-quantum hybrid sealing for multi-device content-key distribution. Seals a
 32-byte content key for one or more recipient devices so only a holder of the
@@ -14,7 +14,7 @@ matching secret key can recover it, with security resting on **both** a classica
 
 ## Construction (v1)
 
-- **KEM**: X-Wing (`draft-connolly-cfrg-xwing-kem`, IACR 2024/039) — X25519 +
+- **KEM**: X-Wing (`draft-connolly-cfrg-xwing-kem`, IACR 2024/039) - X25519 +
   ML-KEM-768, combined via `SHA3-256(ss_M || ss_X || ct_X || pk_X || "\.//^\")`.
 - **Envelope**: HKDF-SHA256 (null salt, versioned domain tag) → ChaCha20-Poly1305
   seals the content key; version + recipient id bound as AEAD associated data.
@@ -48,7 +48,7 @@ fresh content key for forward secrecy, or the same one for a cheap revoke).
 
 ## Features
 
-- `preview-pq` — enables the hybrid KEM + envelope. **Off by default.**
+- `preview-pq` - enables the hybrid KEM + envelope. **Off by default.**
 
 ## Testing
 
@@ -60,7 +60,7 @@ cargo test --features preview-pq
 
 ML-KEM-768 alone places all trust in a 2024-vintage primitive and its pre-1.0
 implementations. The hybrid forces an adversary to break both ML-KEM **and**
-X25519 — matching TLS 1.3 (`X25519MLKEM768`), Signal (PQXDH), SSH
+X25519 - matching TLS 1.3 (`X25519MLKEM768`), Signal (PQXDH), SSH
 (`mlkem768x25519`), and the CFRG general-purpose answer (X-Wing).
 
 Full rationale: [`DECISION.md`](DECISION.md).
