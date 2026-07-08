@@ -4,8 +4,21 @@
 
 Audit-hardening pass (issues #1, #3, #4): error propagation, zeroization
 coverage, parse-boundary validation, dependency hygiene, test coverage.
+Follow-up (#6): HKDF/sha2 digest-state zeroization.
 
 ### Changed
+
+- sha2 0.10 → 0.11 (`zeroize` feature) and hkdf 0.12 → 0.13, closing the
+  deferred half of the zeroization invariant (#6): the HMAC-keyed Sha256
+  cores, block buffers, and PRK-keyed HKDF state now wipe on drop. Before:
+  the shared-secret-derived digest state inside the HKDF stack outlived the
+  derivation un-zeroized (sha2 0.10 offers no digest-state zeroization).
+  `derive_wrap_key` now uses extract-then-wipe instead of `Hkdf::new`, which
+  discards an un-zeroized PRK copy internally. HKDF output is unchanged —
+  the RFC 5869 KAT is the byte-exactness gate. Residual: safe-Rust move
+  semantics can still leave transient stack copies (best-effort stance, as
+  with the sha3 0.11 bump). This also unifies the tree on the digest 0.11
+  generation — digest 0.10 / hmac 0.12 / sha2 0.10 leave the lockfile.
 
 - `EncapsulationKey::encapsulate` and `encapsulate_deterministic` now return
   `Result<(Vec<u8>, SharedSecret), SealError>`. Before: a conversion failure on
