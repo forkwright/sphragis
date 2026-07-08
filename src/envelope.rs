@@ -3,12 +3,17 @@
 //! The X-Wing shared secret is expanded under a versioned domain tag into a
 //! 32-byte wrapping key, which seals the content key with ChaCha20-Poly1305. The
 //! recipient id and version are bound as AEAD associated data.
+//!
+//! Digest-state hygiene: sha2 0.11's `zeroize` feature wipes the HMAC-keyed
+//! Sha256 cores and block buffers on drop (mirroring the sha3 0.11 property in
+//! `hybrid`), so the shared-secret-derived state inside the HKDF stack does not
+//! outlive the derivation.
 
 use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 use chacha20poly1305::{ChaCha20Poly1305, Key, Nonce};
 use hkdf::Hkdf;
 use sha2::Sha256;
-use zeroize::Zeroizing;
+use zeroize::{Zeroize, Zeroizing};
 
 use crate::error::SealError;
 
@@ -35,7 +40,11 @@ pub fn derive_wrap_key(
     domain: &[u8],
 ) -> Result<Zeroizing<[u8; WRAP_KEY_LEN]>, SealError> {
     let salt = [0u8; 32];
-    let hk = Hkdf::<Sha256>::new(Some(&salt), shared_secret);
+    // WHY: extract-then-wipe rather than `Hkdf::new` — `new()` discards its
+    // PRK copy un-zeroized; the keyed state inside `hk` drop-zeroizes via the
+    // sha2 0.11 `zeroize` feature.
+    let (mut prk, hk) = Hkdf::<Sha256>::extract(Some(&salt), shared_secret);
+    prk.zeroize();
     let mut okm = Zeroizing::new([0u8; WRAP_KEY_LEN]);
     hk.expand(domain, okm.as_mut_slice())
         .map_err(|_| SealError::HkdfExpand)?;
