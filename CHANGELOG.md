@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.1](https://github.com/forkwright/sphragis/compare/v0.1.0...v0.1.1) (2026-07-08)
+
+
+### Features
+
+* **sphragis:** initial extraction — X-Wing hybrid KEM standalone crate ([24c0db6](https://github.com/forkwright/sphragis/commit/24c0db691fe692781963b83df58cc56d6b9b768a))
+
+
+### Bug Fixes
+
+* resolve all open audit findings (crypto correctness + zeroization) + lint-clean + Tier-U CI ([#5](https://github.com/forkwright/sphragis/issues/5)) ([3ddcf0e](https://github.com/forkwright/sphragis/commit/3ddcf0edbb7b21039edfc75a8e47e345eba54a47))
+* **sphragis:** zeroize HKDF/sha2 digest state via the digest-0.11 generation ([#7](https://github.com/forkwright/sphragis/issues/7)) ([860d7f9](https://github.com/forkwright/sphragis/commit/860d7f95ca4c51868116fa3eabfe9a370a2d37e9))
+
 ## [Unreleased]
 
 Audit-hardening pass (issues #1, #3, #4): error propagation, zeroization
