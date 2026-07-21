@@ -1,6 +1,16 @@
 # NOTE: the dependency audit (cargo deny + cargo audit + osv-scanner) runs in
 # security.yml per-PR and daily; duplicating it here would double CI spend on
 # required checks.
+#
+# WHY(kanon#2522): the standalone gate-attestation job this file used to carry
+# (hard-fail trailer verify, no fallback build, no branch-protection
+# requirement) is removed -- gate-attestation.yml's adoption of
+# forkwright/kanon's hybrid-gate.yml now does the same trailer check
+# correctly, with a real fmt/check/clippy/nextest fallback build for
+# trailer-less PRs instead of an unconditional hard-fail. Leaving this job in
+# place would have kept showing a permanently-failing, non-required
+# "gate-attestation" check on every trailer-less PR -- a misleading duplicate
+# signal, not a real gate.
 name: CI
 
 on:
@@ -81,43 +91,3 @@ jobs:
         run: cargo test
       - name: cargo test (preview-pq — KAT + round-trip + negatives)
         run: cargo test --features preview-pq
-
-  gate-attestation:
-    name: gate-attestation
-    runs-on: ubuntu-latest
-    steps:
-      - name: Pass trusted automation PRs
-        if: ${{ github.actor == 'dependabot[bot]' || github.actor == 'release-please[bot]' }}
-        run: echo "Gate attestation waived for trusted automation actor."
-
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-        if: ${{ github.actor != 'dependabot[bot]' && github.actor != 'release-please[bot]' }}
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Verify Gate-Passed trailer
-        if: ${{ github.actor != 'dependabot[bot]' && github.actor != 'release-please[bot]' }}
-        run: |
-          commits=$(git log --format="%H" "origin/${{ github.base_ref }}..HEAD")
-          if [ -z "$commits" ]; then
-            echo "ERROR: No commits found in PR"
-            exit 1
-          fi
-
-          found=false
-          for sha in $commits; do
-            body=$(git log -1 --format="%b" "$sha")
-            if echo "$body" | grep -q "^Gate-Passed:"; then
-              version=$(echo "$body" | grep "^Gate-Passed:" | head -1)
-              echo "Found gate attestation: $version"
-              found=true
-              break
-            fi
-          done
-
-          if [ "$found" = false ]; then
-            echo "ERROR: No Gate-Passed trailer found in any PR commit."
-            echo "Run the local gate and commit with the trailer."
-            exit 1
-          fi
