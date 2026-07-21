@@ -1,0 +1,4 @@
+[toolchain]
+# WHY: pin to the declared rust-version (Cargo.toml).
+channel = "1.85"
+components = ["rustfmt", "clippy"]

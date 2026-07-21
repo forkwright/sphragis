@@ -61,8 +61,14 @@ jobs:
         with:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
-      - name: Install cargo-audit
-        run: cargo install cargo-audit --locked --version ^0.22
+      # WHY: install a prebuilt cargo-audit binary rather than source-building
+      # with this crate's pinned toolchain -- that decouples the scanner's
+      # MSRV (cargo-audit 0.22.2 requires Rust >=1.88) from the audited
+      # crate's MSRV (1.85). The exact scanner version is pinned and
+      # deliberately reviewed, never floated.
+      - uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2.83.2
+        with:
+          tool: cargo-audit@0.22.2
       - name: cargo audit
         # WHY: -D unmaintained,unsound,yanked escalates those categories
         # to errors (default is warning only). Suppressions go through
