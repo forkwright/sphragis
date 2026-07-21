@@ -1,18 +1,23 @@
 # WHY(kanon#2522): replaces the org-default trailer-only reusable
 # (forkwright/.github/.github/workflows/gate-attestation.yml@5be130b, job id
-# `gate`, required context "gate / gate-attestation") with the kanon-owned
+# `gate`, required context "gate / gate-attestation") with the kanon-designed
 # hybrid gate. A trailer-stamped PR still takes the fast path; a
 # trailer-less PR now falls through to a REAL fmt/check/clippy/nextest
 # build on GH-hosted ubuntu-latest, which the old org-default never ran.
 #
-# WHY ai_attribution_check/docs_only_exemption are NOT set below
-# (UNVERIFIED-strip, kanon#2522 A4 follow-up): forkwright/kanon main
-# (hybrid-gate.yml) does not yet declare these workflow_call inputs as of
-# this adoption -- passing them would make GH Actions reject the unknown
-# `with:` keys at trigger time. Re-add both once that kanon-side extension
-# is actually on kanon's main. No inline ai-attribution logic exists
-# anywhere in this repo's workflows today, so this remains a net-new check
-# once it lands, not the retirement of an existing pattern.
+# WHY hosted in forkwright/.github, not forkwright/kanon: GitHub cannot
+# resolve a workflow_call reference into a private repo owned by a personal
+# account for other-repo callers -- this adoption originally pointed at
+# kanon and failed to even schedule the workflow (no run appeared at all)
+# before being repointed at the public .github host, which already serves
+# the org-default trailer-only reusable to 8 repos successfully (including
+# this repo's own prior gate-attestation.yml).
+#
+# WHY ai_attribution_check/docs_only_exemption ARE set below: the extended
+# hybrid-gate.yml (declaring both workflow_call inputs) is now live at
+# forkwright/.github. No inline ai-attribution logic exists anywhere in
+# this repo's workflows today, so this is a net-new check, not the
+# retirement of an existing pattern.
 #
 # WHY these with: values (cite): .github/workflows/ci.yml (fmt/check/clippy/
 # test jobs) + .kanon-ci.toml (forge pipeline, same commands +jobs 8 which we
@@ -68,7 +73,7 @@ permissions:
 
 jobs:
   gate:
-    uses: forkwright/kanon/.github/workflows/hybrid-gate.yml@main
+    uses: forkwright/.github/.github/workflows/hybrid-gate.yml@main
     with:
       rust_toolchain: "stable"
       fmt_cmd: "cargo fmt --all -- --check"
@@ -79,4 +84,6 @@ jobs:
       system_packages: ""
       needs_fleet_repo_token: false
       rust_cache_key: "gate-attestation"
+      ai_attribution_check: true
+      docs_only_exemption: true
     secrets: inherit
