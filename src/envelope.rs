@@ -18,7 +18,6 @@ use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 use chacha20poly1305::{ChaCha20Poly1305, Key, Nonce};
 use hkdf::Hkdf;
 use sha2::Sha256;
-use snafu::ResultExt;
 use zeroize::{Zeroize, Zeroizing};
 
 use crate::error::{AeadOpenSnafu, AeadSealSnafu, HkdfExpandSnafu, SealError};
@@ -45,7 +44,7 @@ fn derive_wrap_key_impl(
     prk.zeroize();
     let mut okm = Zeroizing::new([0u8; WRAP_KEY_LEN]);
     hk.expand(domain, okm.as_mut_slice())
-        .context(HkdfExpandSnafu)?;
+        .map_err(|_| HkdfExpandSnafu.build())?;
     Ok(okm)
 }
 
@@ -108,7 +107,7 @@ pub(crate) fn seal(
                 aad,
             },
         )
-        .context(AeadSealSnafu)
+        .map_err(|_| AeadSealSnafu.build())
 }
 
 /// Opens a sealed content key produced by [`seal`].
@@ -127,5 +126,5 @@ pub(crate) fn open(
     cipher
         .decrypt(Nonce::from_slice(nonce), Payload { msg: sealed, aad })
         .map(Zeroizing::new)
-        .context(AeadOpenSnafu)
+        .map_err(|_| AeadOpenSnafu.build())
 }

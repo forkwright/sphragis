@@ -327,10 +327,12 @@ impl DecapsulationKey {
 
         // WHY: all fallible parsing precedes decapsulation so no early return
         // can exist while a shared secret is live on the stack.
-        let ct_m: MlKemCiphertext<MlKem768> =
-            Array::try_from(ct_m_bytes).context(InvalidMlKemSnafu {
+        let ct_m: MlKemCiphertext<MlKem768> = Array::try_from(ct_m_bytes).map_err(|_| {
+            InvalidMlKemSnafu {
                 reason: "ciphertext length".to_string(),
-            })?;
+            }
+            .build()
+        })?;
         let ct_x = x_public_from_slice(ct_x_bytes)?;
 
         let (dk_m, sk_x) = expand(&self.seed);
@@ -454,20 +456,25 @@ impl EncapsulationKey {
         randomness: &[u8; 64],
     ) -> Result<(Vec<u8>, SharedSecret), SealError> {
         let (m_bytes, x_bytes) = randomness.split_at(32);
-        let m: Zeroizing<B32> =
-            Zeroizing::new(Array::try_from(m_bytes).context(WrongLengthSnafu {
+        let m: Zeroizing<B32> = Zeroizing::new(Array::try_from(m_bytes).map_err(|_| {
+            WrongLengthSnafu {
                 what: "ml-kem message seed",
                 expected: 32_usize,
                 actual: m_bytes.len(),
-            })?);
+            }
+            .build()
+        })?);
         // ML-KEM deterministic encapsulation is infallible.
         let (ct_m, ss_m) = self.ek_m.encapsulate_deterministic(&m);
         let ss_m = Zeroizing::new(ss_m);
 
-        let mut eph: [u8; 32] = x_bytes.try_into().context(WrongLengthSnafu {
-            what: "x25519 ephemeral seed",
-            expected: 32_usize,
-            actual: x_bytes.len(),
+        let mut eph: [u8; 32] = x_bytes.try_into().map_err(|_| {
+            WrongLengthSnafu {
+                what: "x25519 ephemeral seed",
+                expected: 32_usize,
+                actual: x_bytes.len(),
+            }
+            .build()
         })?;
         let eph_x = XSecret::from(eph);
         eph.zeroize();
@@ -512,11 +519,17 @@ impl EncapsulationKey {
             }
         );
         let (m_bytes, x_bytes) = bytes.split_at(ML_KEM_EK_LEN);
-        let key: Key<MlKemEk> = Array::try_from(m_bytes).context(InvalidMlKemSnafu {
-            reason: "encapsulation key length".to_string(),
+        let key: Key<MlKemEk> = Array::try_from(m_bytes).map_err(|_| {
+            InvalidMlKemSnafu {
+                reason: "encapsulation key length".to_string(),
+            }
+            .build()
         })?;
-        let ek_m = MlKemEk::new(&key).context(InvalidMlKemSnafu {
-            reason: "encapsulation key decode".to_string(),
+        let ek_m = MlKemEk::new(&key).map_err(|_| {
+            InvalidMlKemSnafu {
+                reason: "encapsulation key decode".to_string(),
+            }
+            .build()
         })?;
         let pk_x = x_public_from_slice(x_bytes)?;
         Ok(Self { ek_m, pk_x })
@@ -560,10 +573,13 @@ fn combine(ss_m: &[u8], ss_x: &[u8], ct_x: &[u8], pk_x: &[u8]) -> SharedSecret {
 }
 
 fn x_public_from_slice(bytes: &[u8]) -> Result<XPublic, SealError> {
-    let arr: [u8; X25519_LEN] = bytes.try_into().context(WrongLengthSnafu {
-        what: "x25519 point",
-        expected: X25519_LEN,
-        actual: bytes.len(),
+    let arr: [u8; X25519_LEN] = bytes.try_into().map_err(|_| {
+        WrongLengthSnafu {
+            what: "x25519 point",
+            expected: X25519_LEN,
+            actual: bytes.len(),
+        }
+        .build()
     })?;
     Ok(XPublic::from(arr))
 }
