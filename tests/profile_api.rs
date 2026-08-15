@@ -25,7 +25,7 @@ fn generate_seal_unseal_round_trip_without_hazmat() {
     let wrapped = seal_for(&content_key, &[ek]).unwrap();
     assert_eq!(wrapped.len(), 1);
 
-    let recovered = unseal(&dk, &wrapped[0]).unwrap();
+    let recovered = unseal(&dk, wrapped.first().unwrap()).unwrap();
     assert_eq!(recovered.as_slice(), &content_key);
 }
 
@@ -43,7 +43,7 @@ fn independently_generated_keypairs_do_not_cross_unseal() {
 
     let wrapped = seal_for(&content_key, &[ek1]).unwrap();
     assert!(
-        unseal(&dk2, &wrapped[0]).is_err(),
+        unseal(&dk2, wrapped.first().unwrap()).is_err(),
         "an independently generated device must not unseal another device's wrap"
     );
 }
