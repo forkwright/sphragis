@@ -523,6 +523,11 @@ fn encapsulation_key_wire_round_trip() {
 // material), so `.unwrap_err()` does not compile here — same reasoning as
 // `tests/entropy_failure.rs`'s `generate_with_rng_returns_entropy_error_not_panic`.
 #[test]
+#[expect(
+    clippy::panic,
+    reason = "test harness: an unmatched error variant IS the test failure, surfaced via panic! \
+              the same way assert!/assert_eq! do internally (mirrors tests/entropy_failure.rs)"
+)]
 fn wrong_length_ek_and_ct_rejected() {
     let (dk, ek) = fresh();
 
