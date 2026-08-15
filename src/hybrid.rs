@@ -490,8 +490,9 @@ mod tests {
     #[test]
     #[expect(
         clippy::unwrap_used,
+        clippy::indexing_slicing,
         clippy::similar_names,
-        reason = "KAT harness: inputs are fixed known-answer vectors, a failed unwrap IS the test failure; expected_sk/pk/ct/ss mirror the vendored vector's own field names (sk/pk/ct/ss), which mirror the X-Wing spec notation; spec-faithful names beat the similar_names heuristic"
+        reason = "KAT harness: inputs are fixed known-answer vectors, a failed unwrap or out-of-bounds index IS the test failure; expected_sk/pk/ct/ss mirror the vendored vector's own field names (sk/pk/ct/ss), which mirror the X-Wing spec notation; spec-faithful names beat the similar_names heuristic"
     )]
     fn deterministic_encapsulate_reproduces_xwing_draft_kat() {
         let doc = vector_json("xwing-draft-connolly-test-vectors.json");
