@@ -260,3 +260,43 @@ KATs are byte-identical to the vectors this repo already pins (a `v1`-wire
 adapter, not a `v2` construction) — otherwise it is a new version, not a
 drop-in. Until that gate is met, `src/hybrid.rs`'s transcription remains the
 implementation and `hazmat` remains the only way to reach it directly.
+
+## 10. Entropy failures are typed, not panics (#16)
+
+`rand_core` 0.6's `OsRng::fill_bytes` panics on OS-RNG failure instead of
+returning a `Result` — a transient host entropy failure would otherwise abort
+the process rather than surface through `SealError`. Every entropy draw
+(`HybridKem::generate`, `EncapsulationKey::encapsulate`, and the AEAD nonce
+inside `seal_for`) now goes through `try_fill_bytes`, propagated as
+`SealError::Entropy { source: rand_core::Error, location }`.
+
+`HybridKem::generate` becomes fallible (`-> Result<(DecapsulationKey,
+EncapsulationKey), SealError>`) — a breaking change taken now, before the
+crate's `preview-pq` API stabilizes. `generate_recipient_keypair` (§9's
+actual public entry point) becomes fallible with it, for the same reason:
+it is a thin wrapper over `HybridKem::generate` and cannot swallow the
+`Result` without either panicking (the exact defect this section fixes) or
+silently discarding the OS-entropy-failure case its caller needs to see.
+
+The RNG is caller-injectable at the primitive layer
+(`HybridKem::generate_with_rng` / `EncapsulationKey::encapsulate_with_rng`,
+each `<R: RngCore + CryptoRng>`) — the same trait bound `x25519-dalek`'s own
+`random_from_rng` requires, taken by `&mut R` rather than by value so one
+injected RNG's state carries across every draw in a call. Per §9's
+hazmat boundary, both seams follow `HybridKem::generate`/
+`EncapsulationKey::encapsulate`'s own split: `pub(crate)` without `hazmat`,
+`pub` with it — an injectable RNG is a conformance-testing affordance
+(`tests/entropy_failure.rs`), not something a normal consumer needs, since
+`generate_recipient_keypair` always draws fresh OS randomness. The envelope
+layer gets its own seam instead: `seal_for_with_rng` (not hazmat-gated,
+alongside `seal_for`) draws twice per recipient across N recipients — the
+KEM encapsulation randomness and the AEAD nonce — which is why it takes
+`&mut R` rather than by-value: a by-value take-and-drop parameter would not
+let one injected RNG's state carry across every draw in a multi-recipient
+batch. This is not a cryptographic choice — the OS RNG cannot be made to
+fail on demand, so injection is the only way to exercise the
+entropy-failure branch under test at all; a failure mode with no test is an
+unverified claim. `rand_core`'s `std` feature is enabled (in addition to
+`getrandom`) so `rand_core::Error` implements `std::error::Error` and can
+sit behind `SealError::Entropy`'s `source` field with a real chain, rather
+than being flattened to a string.

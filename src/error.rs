@@ -25,6 +25,21 @@ pub enum SealError {
         reason: String,
     },
 
+    /// The entropy source failed to supply randomness for key generation,
+    /// encapsulation, or nonce sampling.
+    // WHY: `OsRng::fill_bytes` panics on OS-RNG failure (rand_core 0.6
+    // `os.rs`); every call site uses the fallible `try_fill_bytes` and
+    // surfaces its error here instead, so a transient host entropy failure
+    // is a typed, recoverable `Result`, never a process abort.
+    #[snafu(display("entropy source failed: {source}"))]
+    Entropy {
+        /// The underlying RNG failure.
+        source: rand_core::Error,
+        /// Source location of the failed entropy call.
+        #[snafu(implicit)]
+        location: snafu::Location,
+    },
+
     /// HKDF expansion failed (invalid output length request).
     #[snafu(display("HKDF expand failed"))]
     HkdfExpand,

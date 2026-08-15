@@ -56,7 +56,11 @@ sha3 = { version = "0.11", features = ["zeroize"], optional = true }
 sha2 = { version = "0.11", features = ["zeroize"], optional = true }
 hkdf = { version = "0.13", optional = true }
 chacha20poly1305 = { version = "0.10", optional = true }
-rand_core = { version = "0.6", features = ["getrandom"], optional = true }
+# WHY: "std" (not just "getrandom") so `rand_core::Error` implements
+# `std::error::Error` and can sit behind `SealError::Entropy`'s `source` field
+# — without it, `Error` is the no_std variant (a bare error code, no source
+# chain) and `.context(EntropySnafu)` does not compile.
+rand_core = { version = "0.6", features = ["getrandom", "std"], optional = true }
 
 # Post-quantum hybrid KEM stack (preview-pq only).
 # WHY: released RustCrypto primitives, not the rc-pinned `x-wing` aggregate crate.
@@ -87,6 +91,9 @@ proptest = "1"
 # hash-locked file (crypto-provenance.toml, tests/provenance_lock.rs).
 serde_json = "1"
 hex = "0.4"
+# WHY: tests/entropy_failure.rs implements a mock RngCore to inject an
+# on-demand entropy failure into the `_with_rng` seams (#16).
+rand_core = { version = "0.6", features = ["getrandom"] }
 
 # WHY(sphragis#23): the KAT gate calls the hazmat-only primitive surface
 # directly (HybridKem, derive_wrap_key, direct encaps/decaps) to prove the
@@ -96,6 +103,18 @@ hex = "0.4"
 # it.
 [[test]]
 name = "known_answer_vectors"
+required-features = ["preview-pq", "hazmat"]
+
+# WHY(sphragis#16, sphragis#23): proves the injectable-RNG entropy-failure
+# path on the hazmat-only primitive surface directly (`HybridKem::
+# generate_with_rng`, `EncapsulationKey::encapsulate_with_rng`) — the same
+# reachability reasoning as `known_answer_vectors` above. The runtime logic
+# under test is identical regardless of `hazmat` (the feature only toggles
+# `pub` vs `pub(crate)` on the seam, never its body), so gating this target
+# does not narrow what behavior CI's `preview-pq,hazmat` job actually
+# exercises.
+[[test]]
+name = "entropy_failure"
 required-features = ["preview-pq", "hazmat"]
 
 [lints.rust]

@@ -4,14 +4,15 @@
 //! means re-sealing the (optionally rotated) content key for the remaining
 //! recipients only.
 
-use rand_core::{OsRng, RngCore};
+use rand_core::{CryptoRng, OsRng, RngCore};
 use serde::{Deserialize, Serialize};
-use snafu::ensure;
+use snafu::{ensure, ResultExt};
 use zeroize::Zeroizing;
 
 use crate::envelope::{derive_wrap_key, open, seal, NONCE_LEN, TAG_LEN};
 use crate::error::{
-    EnvelopeTooLargeSnafu, SealError, TrailingDataSnafu, UnsupportedVersionSnafu, WrongLengthSnafu,
+    EntropySnafu, EnvelopeTooLargeSnafu, SealError, TrailingDataSnafu, UnsupportedVersionSnafu,
+    WrongLengthSnafu,
 };
 use crate::hybrid::{DecapsulationKey, EncapsulationKey, HybridKem, CIPHERTEXT_LEN};
 use crate::{SEAL_VERSION_V1, WRAP_DOMAIN_V1};
@@ -241,9 +242,12 @@ impl WrappedContentKey {
 /// normal public API (sphragis#23) — see `DECISION.md` for the
 /// envelope-vs-primitive boundary and the upstream-adapter seam this exists
 /// to keep stable across a future primitive-provider swap.
+///
+/// # Errors
+///
+/// Returns [`SealError::Entropy`] if the OS entropy source fails.
 // kanon:ignore RUST/pub-visibility -- re-exported in lib.rs
-#[must_use]
-pub fn generate_recipient_keypair() -> (DecapsulationKey, EncapsulationKey) {
+pub fn generate_recipient_keypair() -> Result<(DecapsulationKey, EncapsulationKey), SealError> {
     HybridKem::generate()
 }
 
@@ -254,22 +258,44 @@ pub fn generate_recipient_keypair() -> (DecapsulationKey, EncapsulationKey) {
 ///
 /// # Errors
 ///
-/// Returns a [`SealError`] if encapsulation, HKDF, or the AEAD seal fails for
-/// any recipient.
+/// Returns a [`SealError`] if entropy generation, encapsulation, HKDF, or the
+/// AEAD seal fails for any recipient.
 // kanon:ignore RUST/pub-visibility -- re-exported in lib.rs
 pub fn seal_for(
     content_key: &[u8; CONTENT_KEY_LEN],
     recipients: &[EncapsulationKey],
 ) -> Result<Vec<WrappedContentKey>, SealError> {
+    seal_for_with_rng(content_key, recipients, &mut OsRng)
+}
+
+/// Seals a content key for each recipient device using the given CSPRNG.
+///
+/// WHY: isolates BOTH entropy draws per recipient — the KEM encapsulation
+/// randomness and the AEAD nonce — behind one injectable seam, so a test can
+/// fail the RNG partway through a multi-recipient batch and prove the loop
+/// returns [`SealError::Entropy`] with no [`WrappedContentKey`] emitted for
+/// any recipient, including ones already processed successfully: the early
+/// `?` return drops `out` before this function returns, so a caller never
+/// observes a partial wrap set.
+///
+/// # Errors
+///
+/// Returns a [`SealError`] if entropy generation, encapsulation, HKDF, or the
+/// AEAD seal fails for any recipient.
+pub fn seal_for_with_rng<R: RngCore + CryptoRng>(
+    content_key: &[u8; CONTENT_KEY_LEN],
+    recipients: &[EncapsulationKey],
+    rng: &mut R,
+) -> Result<Vec<WrappedContentKey>, SealError> {
     let mut out = Vec::with_capacity(recipients.len());
     for ek in recipients {
         let recipient_id = RecipientId::of(ek);
-        let (kem_ciphertext, ss) = ek.encapsulate()?;
+        let (kem_ciphertext, ss) = ek.encapsulate_with_rng(rng)?;
 
         let wrap_key = derive_wrap_key(ss.as_slice(), WRAP_DOMAIN_V1)?;
 
         let mut nonce = [0u8; NONCE_LEN];
-        OsRng.fill_bytes(&mut nonce);
+        rng.try_fill_bytes(&mut nonce).context(EntropySnafu)?;
 
         let mut wck = WrappedContentKey {
             version: SEAL_VERSION_V1,
