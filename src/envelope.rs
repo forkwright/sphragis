@@ -20,7 +20,7 @@ use hkdf::Hkdf;
 use sha2::Sha256;
 use zeroize::{Zeroize, Zeroizing};
 
-use crate::error::SealError;
+use crate::error::{AeadOpenSnafu, AeadSealSnafu, HkdfExpandSnafu, SealError};
 
 /// AEAD nonce length (ChaCha20-Poly1305).
 pub(crate) const NONCE_LEN: usize = 12;
@@ -44,7 +44,7 @@ fn derive_wrap_key_impl(
     prk.zeroize();
     let mut okm = Zeroizing::new([0u8; WRAP_KEY_LEN]);
     hk.expand(domain, okm.as_mut_slice())
-        .map_err(|_| SealError::HkdfExpand)?;
+        .map_err(|_| HkdfExpandSnafu.build())?;
     Ok(okm)
 }
 
@@ -107,7 +107,7 @@ pub(crate) fn seal(
                 aad,
             },
         )
-        .map_err(|_| SealError::AeadSeal)
+        .map_err(|_| AeadSealSnafu.build())
 }
 
 /// Opens a sealed content key produced by [`seal`].
@@ -126,5 +126,5 @@ pub(crate) fn open(
     cipher
         .decrypt(Nonce::from_slice(nonce), Payload { msg: sealed, aad })
         .map(Zeroizing::new)
-        .map_err(|_| SealError::AeadOpen)
+        .map_err(|_| AeadOpenSnafu.build())
 }

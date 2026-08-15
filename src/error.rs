@@ -16,6 +16,9 @@ pub enum SealError {
         expected: usize,
         /// Actual byte length.
         actual: usize,
+        /// Source location of the failing check.
+        #[snafu(implicit)]
+        location: snafu::Location,
     },
 
     /// An ML-KEM key or ciphertext failed structural validation.
@@ -23,6 +26,9 @@ pub enum SealError {
     InvalidMlKem {
         /// Failure detail.
         reason: String,
+        /// Source location of the failing check.
+        #[snafu(implicit)]
+        location: snafu::Location,
     },
 
     /// The entropy source failed to supply randomness for key generation,
@@ -42,21 +48,36 @@ pub enum SealError {
 
     /// HKDF expansion failed (invalid output length request).
     #[snafu(display("HKDF expand failed"))]
-    HkdfExpand,
+    HkdfExpand {
+        /// Source location of the failing call.
+        #[snafu(implicit)]
+        location: snafu::Location,
+    },
 
     /// AEAD sealing of the content key failed.
     #[snafu(display("content-key AEAD seal failed"))]
-    AeadSeal,
+    AeadSeal {
+        /// Source location of the failing call.
+        #[snafu(implicit)]
+        location: snafu::Location,
+    },
 
     /// AEAD opening failed: wrong recipient, tampered ciphertext, or wrong key.
     #[snafu(display("content-key AEAD open failed"))]
-    AeadOpen,
+    AeadOpen {
+        /// Source location of the failing call.
+        #[snafu(implicit)]
+        location: snafu::Location,
+    },
 
     /// The wrapped content key declared a version this build cannot decode.
     #[snafu(display("unsupported seal version: {version}"))]
     UnsupportedVersion {
         /// The version byte found on the wire.
         version: u8,
+        /// Source location of the failing check.
+        #[snafu(implicit)]
+        location: snafu::Location,
     },
 
     /// CBOR (de)serialization of a wrapped content key failed.
@@ -64,6 +85,9 @@ pub enum SealError {
     Serialization {
         /// Failure detail.
         reason: String,
+        /// Source location of the failing call.
+        #[snafu(implicit)]
+        location: snafu::Location,
     },
 
     /// CBOR input exceeded the maximum possible size of a genuine v1
@@ -74,6 +98,9 @@ pub enum SealError {
         size: usize,
         /// The maximum size a genuine v1 envelope can encode to.
         max: usize,
+        /// Source location of the failing check.
+        #[snafu(implicit)]
+        location: snafu::Location,
     },
 
     /// CBOR input contained a complete envelope followed by additional
@@ -83,5 +110,8 @@ pub enum SealError {
     TrailingData {
         /// How many bytes followed the decoded envelope.
         trailing: usize,
+        /// Source location of the failing check.
+        #[snafu(implicit)]
+        location: snafu::Location,
     },
 }
