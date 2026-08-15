@@ -28,7 +28,7 @@ use zeroize::{Zeroize, Zeroizing};
 use rand_core::{CryptoRng, OsRng, RngCore};
 use snafu::{ensure, ResultExt};
 
-use crate::error::{EntropySnafu, SealError, WrongLengthSnafu};
+use crate::error::{EntropySnafu, InvalidMlKemSnafu, SealError, WrongLengthSnafu};
 
 /// X-Wing domain-separation label: ASCII `\.//^\`.
 const X_WING_LABEL: &[u8; 6] = br"\.//^\";
@@ -47,26 +47,55 @@ pub const CIPHERTEXT_LEN: usize = ML_KEM_CT_LEN + X25519_LEN; // kanon:ignore RU
 /// X-Wing decapsulation-key (private) seed length.
 pub const DECAPSULATION_KEY_LEN: usize = 32; // kanon:ignore RUST/pub-visibility -- public constant in from_seed/to_seed signatures
 /// Hybrid shared-secret length.
-pub const SHARED_SECRET_LEN: usize = 32; // kanon:ignore RUST/pub-visibility -- public constant in the SharedSecret alias
+pub const SHARED_SECRET_LEN: usize = 32; // kanon:ignore RUST/pub-visibility -- public constant in the SharedSecret newtype
 
 /// A hybrid shared secret. Zeroized on drop.
 ///
+/// A newtype, not a bare `Zeroizing<[u8; N]>` alias (sphragis#25): a plain
+/// alias derives `Debug` from `[u8; N]` itself, so `{:?}` would print the
+/// live secret bytes — `Zeroizing` protects memory on drop, not the value
+/// while it is alive. This type's `Debug` (below) is hand-written to redact
+/// them instead, matching [`DecapsulationKey`]'s existing redacted `Debug`.
+/// `Zeroizing` still owns the storage, so drop-zeroize is unchanged.
+///
 /// Internal: without `hazmat`, no operation (`HybridKem::generate`, direct
 /// `encapsulate`/`decapsulate`, `derive_wrap_key` — see sphragis#23) can
-/// produce one, so the alias itself is `pub(crate)`, matching `HybridKem`'s
+/// produce one, so the type itself is `pub(crate)`, matching `HybridKem`'s
 /// own `pub(crate)`/`pub` split below. `EncapsulationKey::encapsulate_deterministic`
 /// (the one other former source of a `SharedSecret`) is a private method
 /// (forkwright/sphragis#17), not a public one, so it does not force this
-/// alias to stay reachable.
+/// type to stay reachable.
 #[cfg(not(feature = "hazmat"))]
-pub(crate) type SharedSecret = Zeroizing<[u8; SHARED_SECRET_LEN]>;
+pub(crate) struct SharedSecret(Zeroizing<[u8; SHARED_SECRET_LEN]>);
 /// A hybrid shared secret. Zeroized on drop.
+///
+/// A newtype, not a bare `Zeroizing<[u8; N]>` alias — see the non-`hazmat`
+/// doc comment above for why (sphragis#25).
 ///
 /// HAZMAT: the generic hybrid-KEM primitive's raw output, reachable only
 /// with the `hazmat` feature — no stability promise (sphragis#23).
 // kanon:ignore RUST/pub-visibility -- hazmat-only primitive surface (sphragis#23): re-exported for KAT/conformance testing, feature-gated off the normal public API
 #[cfg(feature = "hazmat")]
-pub type SharedSecret = Zeroizing<[u8; SHARED_SECRET_LEN]>;
+pub struct SharedSecret(Zeroizing<[u8; SHARED_SECRET_LEN]>);
+
+impl core::fmt::Debug for SharedSecret {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("SharedSecret([REDACTED])")
+    }
+}
+
+impl SharedSecret {
+    /// Returns the shared secret's bytes.
+    ///
+    /// WARNING: the returned slice must never be logged, printed, or
+    /// otherwise persisted outside the derivation it feeds — that is
+    /// exactly the leak this type's redacting `Debug` exists to prevent one
+    /// layer up.
+    #[must_use]
+    pub fn as_slice(&self) -> &[u8] {
+        self.0.as_slice()
+    }
+}
 
 type MlKemDk = ml_kem::DecapsulationKey<MlKem768>;
 type MlKemEk = ml_kem::EncapsulationKey<MlKem768>;
@@ -299,8 +328,8 @@ impl DecapsulationKey {
         // WHY: all fallible parsing precedes decapsulation so no early return
         // can exist while a shared secret is live on the stack.
         let ct_m: MlKemCiphertext<MlKem768> =
-            Array::try_from(ct_m_bytes).map_err(|_| SealError::InvalidMlKem {
-                reason: "ciphertext length".into(),
+            Array::try_from(ct_m_bytes).context(InvalidMlKemSnafu {
+                reason: "ciphertext length".to_string(),
             })?;
         let ct_x = x_public_from_slice(ct_x_bytes)?;
 
@@ -426,20 +455,18 @@ impl EncapsulationKey {
     ) -> Result<(Vec<u8>, SharedSecret), SealError> {
         let (m_bytes, x_bytes) = randomness.split_at(32);
         let m: Zeroizing<B32> =
-            Zeroizing::new(
-                Array::try_from(m_bytes).map_err(|_| SealError::WrongLength {
-                    what: "ml-kem message seed",
-                    expected: 32,
-                    actual: m_bytes.len(),
-                })?,
-            );
+            Zeroizing::new(Array::try_from(m_bytes).context(WrongLengthSnafu {
+                what: "ml-kem message seed",
+                expected: 32_usize,
+                actual: m_bytes.len(),
+            })?);
         // ML-KEM deterministic encapsulation is infallible.
         let (ct_m, ss_m) = self.ek_m.encapsulate_deterministic(&m);
         let ss_m = Zeroizing::new(ss_m);
 
-        let mut eph: [u8; 32] = x_bytes.try_into().map_err(|_| SealError::WrongLength {
+        let mut eph: [u8; 32] = x_bytes.try_into().context(WrongLengthSnafu {
             what: "x25519 ephemeral seed",
-            expected: 32,
+            expected: 32_usize,
             actual: x_bytes.len(),
         })?;
         let eph_x = XSecret::from(eph);
@@ -485,11 +512,11 @@ impl EncapsulationKey {
             }
         );
         let (m_bytes, x_bytes) = bytes.split_at(ML_KEM_EK_LEN);
-        let key: Key<MlKemEk> = Array::try_from(m_bytes).map_err(|_| SealError::InvalidMlKem {
-            reason: "encapsulation key length".into(),
+        let key: Key<MlKemEk> = Array::try_from(m_bytes).context(InvalidMlKemSnafu {
+            reason: "encapsulation key length".to_string(),
         })?;
-        let ek_m = MlKemEk::new(&key).map_err(|_| SealError::InvalidMlKem {
-            reason: "encapsulation key decode".into(),
+        let ek_m = MlKemEk::new(&key).context(InvalidMlKemSnafu {
+            reason: "encapsulation key decode".to_string(),
         })?;
         let pk_x = x_public_from_slice(x_bytes)?;
         Ok(Self { ek_m, pk_x })
@@ -529,11 +556,11 @@ fn combine(ss_m: &[u8], ss_x: &[u8], ct_x: &[u8], pk_x: &[u8]) -> SharedSecret {
     Digest::update(&mut h, ct_x);
     Digest::update(&mut h, pk_x);
     Digest::update(&mut h, X_WING_LABEL);
-    Zeroizing::new(h.finalize().into())
+    SharedSecret(Zeroizing::new(h.finalize().into()))
 }
 
 fn x_public_from_slice(bytes: &[u8]) -> Result<XPublic, SealError> {
-    let arr: [u8; X25519_LEN] = bytes.try_into().map_err(|_| SealError::WrongLength {
+    let arr: [u8; X25519_LEN] = bytes.try_into().context(WrongLengthSnafu {
         what: "x25519 point",
         expected: X25519_LEN,
         actual: bytes.len(),

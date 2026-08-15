@@ -516,13 +516,14 @@ fn encapsulation_key_wire_round_trip() {
     );
 }
 
-/// Wrong-length encapsulation-key and ciphertext inputs are rejected.
+/// Wrong-length encapsulation-key and ciphertext inputs are rejected, and
+/// the rejection carries the failing call site's location (sphragis#26).
 #[test]
 fn wrong_length_ek_and_ct_rejected() {
     let (dk, ek) = fresh();
 
     let ek_bytes = ek.to_bytes();
-    assert!(EncapsulationKey::from_bytes(&ek_bytes[..ek_bytes.len() - 1]).is_err());
+    let short_ek_err = EncapsulationKey::from_bytes(&ek_bytes[..ek_bytes.len() - 1]).unwrap_err();
     assert!(EncapsulationKey::from_bytes(&[]).is_err());
     let mut long = ek.to_bytes();
     long.push(0);
@@ -532,6 +533,36 @@ fn wrong_length_ek_and_ct_rejected() {
     assert!(dk.decapsulate(&ct[..ct.len() - 1]).is_err());
     assert!(dk.decapsulate(&[]).is_err());
     assert!(dk.decapsulate(&[0u8; CIPHERTEXT_LEN - 1]).is_err());
+
+    let SealError::WrongLength { location, .. } = short_ek_err else {
+        panic!("expected SealError::WrongLength, got {short_ek_err:?}");
+    };
+    assert!(
+        location.file.ends_with("hybrid.rs"),
+        "the implicit location must name the failing call site, got {}",
+        location.file
+    );
+}
+
+/// A `SharedSecret`'s `Debug` output redacts the secret: it must never
+/// print the raw bytes, whether from a stray `tracing::debug!(?ss)`, a
+/// leftover `dbg!(ss)`, or an error-context capture (sphragis#25).
+#[test]
+fn shared_secret_debug_is_redacted() {
+    let (_dk, ek) = fresh();
+    let (_ct, ss) = ek.encapsulate().unwrap();
+
+    let formatted = format!("{ss:?}");
+    let raw_hex = hex::encode(ss.as_slice());
+
+    assert!(
+        formatted.contains("REDACTED"),
+        "SharedSecret's Debug output must carry a redaction marker, got {formatted:?}"
+    );
+    assert!(
+        !formatted.contains(&raw_hex),
+        "SharedSecret's Debug output must not contain the secret bytes, got {formatted:?}"
+    );
 }
 
 /// Independent encapsulations to one key draw fresh randomness: no ciphertext

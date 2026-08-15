@@ -11,8 +11,8 @@ use zeroize::Zeroizing;
 
 use crate::envelope::{derive_wrap_key, open, seal, NONCE_LEN, TAG_LEN};
 use crate::error::{
-    EntropySnafu, EnvelopeTooLargeSnafu, SealError, TrailingDataSnafu, UnsupportedVersionSnafu,
-    WrongLengthSnafu,
+    EntropySnafu, EnvelopeTooLargeSnafu, SealError, SerializationSnafu, TrailingDataSnafu,
+    UnsupportedVersionSnafu, WrongLengthSnafu,
 };
 use crate::hybrid::{DecapsulationKey, EncapsulationKey, HybridKem, CIPHERTEXT_LEN};
 use crate::{SEAL_VERSION_V1, WRAP_DOMAIN_V1};
@@ -129,8 +129,11 @@ impl WrappedContentKey {
     /// Returns [`SealError::Serialization`] on encoding failure.
     pub fn to_cbor(&self) -> Result<Vec<u8>, SealError> {
         let mut buf = Vec::new();
-        ciborium::into_writer(self, &mut buf).map_err(|e| SealError::Serialization {
-            reason: e.to_string(),
+        ciborium::into_writer(self, &mut buf).map_err(|e| {
+            SerializationSnafu {
+                reason: e.to_string(),
+            }
+            .build()
         })?;
         Ok(buf)
     }
@@ -171,10 +174,12 @@ impl WrappedContentKey {
         // check of its own, so this is what makes the trailing-data check
         // below meaningful rather than a no-op.
         let mut remaining = bytes;
-        let wck: Self =
-            ciborium::from_reader(&mut remaining).map_err(|e| SealError::Serialization {
+        let wck: Self = ciborium::from_reader(&mut remaining).map_err(|e| {
+            SerializationSnafu {
                 reason: e.to_string(),
-            })?;
+            }
+            .build()
+        })?;
         ensure!(
             remaining.is_empty(),
             TrailingDataSnafu {
@@ -323,9 +328,10 @@ pub fn unseal(
     wck: &WrappedContentKey,
 ) -> Result<Zeroizing<Vec<u8>>, SealError> {
     if wck.version != SEAL_VERSION_V1 {
-        return Err(SealError::UnsupportedVersion {
+        return UnsupportedVersionSnafu {
             version: wck.version,
-        });
+        }
+        .fail();
     }
     let ss = dk.decapsulate(&wck.kem_ciphertext)?;
     let wrap_key = derive_wrap_key(ss.as_slice(), WRAP_DOMAIN_V1)?;
