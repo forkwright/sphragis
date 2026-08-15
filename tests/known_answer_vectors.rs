@@ -540,9 +540,7 @@ fn from_cbor_rejects_indefinite_length_chunk_lying_about_size() {
 fn from_cbor_rejects_duplicate_field() {
     let (_dk, ek) = fresh();
     let content_key = [0x19u8; CONTENT_KEY_LEN];
-    let valid = seal_for(&content_key, &[ek]).unwrap()[0].to_cbor().unwrap();
-
-    let mut malformed = valid.clone();
+    let mut malformed = seal_for(&content_key, &[ek]).unwrap()[0].to_cbor().unwrap();
     malformed[0] = 0xA6; // map header: 6 pairs (was 5)
     let version_pair = malformed[1..10].to_vec(); // "version" key (8 bytes) + its u8 value (1 byte)
     malformed.splice(10..10, version_pair);
@@ -564,9 +562,7 @@ fn from_cbor_rejects_duplicate_field() {
 fn from_cbor_rejects_unknown_field() {
     let (_dk, ek) = fresh();
     let content_key = [0x1Au8; CONTENT_KEY_LEN];
-    let valid = seal_for(&content_key, &[ek]).unwrap()[0].to_cbor().unwrap();
-
-    let mut malformed = valid.clone();
+    let mut malformed = seal_for(&content_key, &[ek]).unwrap()[0].to_cbor().unwrap();
     malformed[0] = 0xA6; // map header: 6 pairs (was 5)
     malformed.push(0x64); // text string, additional-info 4 ("evil".len())
     malformed.extend_from_slice(b"evil");
