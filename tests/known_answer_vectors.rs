@@ -426,3 +426,22 @@ fn from_cbor_rejects_unknown_version() {
         "an unknown version must be rejected at decode, not reinterpreted"
     );
 }
+
+/// `from_cbor` must require full consumption of the input after exactly one
+/// top-level object. `ciborium::from_reader` returns as soon as it has
+/// decoded one value and performs no EOF check of its own, so bytes
+/// appended after a complete, valid envelope must not be silently accepted
+/// — two distinct byte strings decoding to the same envelope is a
+/// malleability surface for anything that treats the sealed bytes as
+/// canonical (framing, signatures, hashes, concatenated records).
+#[test]
+fn from_cbor_rejects_trailing_bytes() {
+    let (_dk, ek) = fresh();
+    let content_key = [0x15u8; CONTENT_KEY_LEN];
+    let mut bytes = seal_for(&content_key, &[ek]).unwrap()[0].to_cbor().unwrap();
+    bytes.extend_from_slice(&[0xDE, 0xAD, 0xBE, 0xEF]);
+    assert!(
+        WrappedContentKey::from_cbor(&bytes).is_err(),
+        "four trailing bytes after a complete, valid envelope must be rejected, not silently accepted"
+    );
+}
