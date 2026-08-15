@@ -51,18 +51,22 @@ pub const SHARED_SECRET_LEN: usize = 32; // kanon:ignore RUST/pub-visibility -- 
 
 /// A hybrid shared secret. Zeroized on drop.
 ///
-/// The alias name stays reachable at `sphragis::hybrid::SharedSecret` even
-/// without `hazmat` — [`EncapsulationKey::encapsulate_deterministic`] (a
-/// pre-existing `#[doc(hidden)]` KAT-only method, unrelated to sphragis#23)
-/// returns it unconditionally, so narrowing this alias's own visibility
-/// would leak it through that method's signature instead
-/// (`private_interfaces`, denied under `-D warnings`). This is inert: no
-/// operation reachable without `hazmat` (`HybridKem::generate`, direct
+/// Internal: without `hazmat`, no operation (`HybridKem::generate`, direct
 /// `encapsulate`/`decapsulate`, `derive_wrap_key` — see sphragis#23) can
-/// produce a real X-Wing-derived value of it, and `Zeroizing<[u8; 32]>` — the
-/// type this aliases — carries no capability a consumer could not already
-/// construct directly from the public `zeroize` crate.
-pub type SharedSecret = Zeroizing<[u8; SHARED_SECRET_LEN]>; // kanon:ignore RUST/pub-visibility -- re-exported in lib.rs under hazmat only (sphragis#23); stays reachable via the hybrid module path regardless, see doc comment above
+/// produce one, so the alias itself is `pub(crate)`, matching `HybridKem`'s
+/// gating above. `EncapsulationKey::encapsulate_deterministic` (the one
+/// other former source of a `SharedSecret`) is a private method
+/// (forkwright/sphragis#17), not a public one, so it does not force this
+/// alias to stay reachable.
+#[cfg(not(feature = "hazmat"))]
+pub(crate) type SharedSecret = Zeroizing<[u8; SHARED_SECRET_LEN]>;
+/// A hybrid shared secret. Zeroized on drop.
+///
+/// HAZMAT: the generic hybrid-KEM primitive's raw output, reachable only
+/// with the `hazmat` feature — no stability promise (sphragis#23).
+// kanon:ignore RUST/pub-visibility -- hazmat-only primitive surface (sphragis#23): re-exported for KAT/conformance testing, feature-gated off the normal public API
+#[cfg(feature = "hazmat")]
+pub type SharedSecret = Zeroizing<[u8; SHARED_SECRET_LEN]>;
 
 type MlKemDk = ml_kem::DecapsulationKey<MlKem768>;
 type MlKemEk = ml_kem::EncapsulationKey<MlKem768>;
