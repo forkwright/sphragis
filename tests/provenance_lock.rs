@@ -20,13 +20,6 @@ use std::fs;
 
 use sha2::{Digest, Sha256};
 
-/// Lowercase hex encoding. Avoids pulling a `hex` runtime dependency into the
-/// crate solely for a digest-comparison test (`hex-literal` only provides a
-/// compile-time macro, not a runtime encoder).
-fn to_hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
-}
-
 fn provenance() -> toml::Value {
     let raw = fs::read_to_string(concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -133,7 +126,7 @@ fn vendored_vector_files_match_recorded_hash() {
 
         let bytes = fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/").to_owned() + vendored_file)
             .unwrap_or_else(|e| panic!("vendored vector `{id}` at {vendored_file}: {e}"));
-        let actual = to_hex(Sha256::digest(&bytes).as_slice());
+        let actual = hex::encode(Sha256::digest(&bytes).as_slice());
         assert_eq!(
             actual, expected,
             "vendored vector `{id}` at {vendored_file} hashes to {actual}, \

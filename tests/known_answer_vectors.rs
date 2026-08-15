@@ -61,6 +61,10 @@ fn hex_field(v: &serde_json::Value, field: &str) -> Vec<u8> {
 /// X-Wing KAT: deterministic encapsulation reproduces the published
 /// encapsulation key, ciphertext, and shared secret; decapsulation recovers
 /// the same shared secret.
+#[expect(
+    clippy::similar_names,
+    reason = "expected_sk/pk/ct/ss mirror the vendored vector's own field names (sk/pk/ct/ss), which mirror the X-Wing spec notation; spec-faithful names beat the similar_names heuristic (hybrid.rs does the same for ss_m/ss_x/ct_x/pk_x)"
+)]
 #[test]
 fn xwing_draft_kat_vector_0() {
     let doc = vector_json("xwing-draft-connolly-test-vectors.json");
@@ -267,11 +271,13 @@ fn chacha20poly1305_rfc8439_2_8_2() {
         "206f6e6c79206f6e652074697020666f7220746865206675747572652c2073"
         "756e73637265656e20776f756c642062652069742e"
     );
+    // WHY: each hex! fragment must independently have an even hex-digit count
+    // (hex-literal parses per-fragment, not the virtual concatenation) — split
+    // at the ciphertext/tag boundary plus even 76-char chunks, not by feel.
     let expected_ciphertext_and_tag = hex!(
-        "d31a8d34648e60db7b86afbc53ef7ec2a4aded51296e08fea9e2b5a736ee62d"
-        "63dbea45e8ca9671282fafb69da92728b1a71de0a9e060b2905d6a5b67ecd3b"
-        "3692ddbd7f2d778b8c9803aee328091b58fab324e4fad675945585808b4831d"
-        "7bc3ff4def08e4b7a9de576d26586cec64b6116"
+        "d31a8d34648e60db7b86afbc53ef7ec2a4aded51296e08fea9e2b5a736ee62d63dbea45e8ca9"
+        "671282fafb69da92728b1a71de0a9e060b2905d6a5b67ecd3b3692ddbd7f2d778b8c9803aee3"
+        "28091b58fab324e4fad675945585808b4831d7bc3ff4def08e4b7a9de576d26586cec64b6116"
         "1ae10b594f09e26a7e902ecbd0600691"
     );
 
