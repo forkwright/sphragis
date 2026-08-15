@@ -375,8 +375,10 @@ fn recipient_id_aad_binding_isolated() {
     );
 }
 
-/// `from_cbor` rejects an unbounded / oversized KEM ciphertext at the parse
-/// boundary, before it can reach the KEM.
+/// `from_cbor` rejects an unbounded / oversized KEM ciphertext before it can
+/// reach the KEM — and now, before it can even reach deserialization: a
+/// 1 MiB `kem_ciphertext` blows the whole-envelope size cap, so the input is
+/// turned away outright rather than allocated and then found wrong-length.
 #[test]
 fn from_cbor_rejects_oversized_kem_ciphertext() {
     let (_dk, ek) = fresh();
@@ -387,9 +389,9 @@ fn from_cbor_rejects_oversized_kem_ciphertext() {
     assert!(
         matches!(
             WrappedContentKey::from_cbor(&bytes),
-            Err(SealError::WrongLength { .. })
+            Err(SealError::EnvelopeTooLarge { .. })
         ),
-        "a decoded kem_ciphertext must be exactly CIPHERTEXT_LEN"
+        "an oversized envelope must be rejected by the size cap before deserializing"
     );
 }
 
@@ -441,7 +443,140 @@ fn from_cbor_rejects_trailing_bytes() {
     let mut bytes = seal_for(&content_key, &[ek]).unwrap()[0].to_cbor().unwrap();
     bytes.extend_from_slice(&[0xDE, 0xAD, 0xBE, 0xEF]);
     assert!(
-        WrappedContentKey::from_cbor(&bytes).is_err(),
+        matches!(
+            WrappedContentKey::from_cbor(&bytes),
+            Err(SealError::TrailingData { .. })
+        ),
         "four trailing bytes after a complete, valid envelope must be rejected, not silently accepted"
+    );
+}
+
+/// Appending a single extra byte — of any value — to a complete, valid
+/// envelope must always be rejected. Proptest coverage of the malleability
+/// property `from_cbor_rejects_trailing_bytes` demonstrates for one fixed
+/// byte sequence.
+#[test]
+fn from_cbor_rejects_any_appended_byte() {
+    let (_dk, ek) = fresh();
+    let content_key = [0x16u8; CONTENT_KEY_LEN];
+    let valid = seal_for(&content_key, &[ek]).unwrap()[0].to_cbor().unwrap();
+    proptest::proptest!(|(extra in 0u8..=255u8)| {
+        let mut tampered = valid.clone();
+        tampered.push(extra);
+        proptest::prop_assert!(
+            WrappedContentKey::from_cbor(&tampered).is_err(),
+            "appending byte {extra:#04x} to a complete, valid envelope must be rejected"
+        );
+    });
+}
+
+/// Locates the `kem_ciphertext` map key inside a real `to_cbor()` output and
+/// returns everything up to and including that key's own bytes, so a test
+/// can splice in a hand-crafted (malformed) value for exactly that field.
+/// Field order is struct declaration order (ciborium encodes a struct as a
+/// CBOR map in field order — verified against `ciborium` 0.2.2
+/// `src/ser/mod.rs`'s `SerializeStruct::serialize_field`), so this key
+/// always follows `version` and `recipient_id` in a genuine encoding.
+fn split_before_kem_ciphertext_value(valid: &[u8]) -> Vec<u8> {
+    let mut key_marker = vec![0x6e_u8]; // text string, additional-info 14 ("kem_ciphertext".len())
+    key_marker.extend_from_slice(b"kem_ciphertext");
+    let key_pos = valid
+        .windows(key_marker.len())
+        .position(|w| w == key_marker.as_slice())
+        .unwrap();
+    valid[..key_pos + key_marker.len()].to_vec()
+}
+
+/// `from_cbor` must not honour a CBOR byte-string header that declares a
+/// length far larger than the bytes actually supplied. Pre-fix, `Vec<u8>`
+/// decoded through serde's generic sequence path, pre-allocating off the
+/// declared count (capped at 1 MiB by serde's own `size_hint::cautious`,
+/// per the crate's existing 1 MiB oversized-ciphertext test); the
+/// `serde_bytes` byte-string path this fix adds grows its buffer only as
+/// bytes are actually read from the input (`ciborium` 0.2.2
+/// `deserialize_byte_buf`, `src/de/mod.rs:384-403`), so a length that lies
+/// is bounded by what is actually present, not by what it claims.
+#[test]
+fn from_cbor_rejects_lying_byte_string_length() {
+    let (_dk, ek) = fresh();
+    let content_key = [0x17u8; CONTENT_KEY_LEN];
+    let valid = seal_for(&content_key, &[ek]).unwrap()[0].to_cbor().unwrap();
+    let mut malformed = split_before_kem_ciphertext_value(&valid);
+    // Byte string (major type 2), additional-info 26: 4-byte length follows.
+    malformed.push(0x5A);
+    malformed.extend_from_slice(&1_000_000_u32.to_be_bytes());
+    malformed.extend_from_slice(&[0x01, 0x02, 0x03]); // far short of the declared length
+    assert!(
+        WrappedContentKey::from_cbor(&malformed).is_err(),
+        "a byte-string header declaring 1,000,000 bytes with 3 actually present must be rejected, not hang or over-allocate"
+    );
+}
+
+/// `from_cbor` must handle an indefinite-length byte string (RFC 8949
+/// §3.2.3) the same way: a chunk header that lies about its own length,
+/// with the input ending before that many bytes exist, must be rejected
+/// without over-reading.
+#[test]
+fn from_cbor_rejects_indefinite_length_chunk_lying_about_size() {
+    let (_dk, ek) = fresh();
+    let content_key = [0x18u8; CONTENT_KEY_LEN];
+    let valid = seal_for(&content_key, &[ek]).unwrap()[0].to_cbor().unwrap();
+    let mut malformed = split_before_kem_ciphertext_value(&valid);
+    malformed.push(0x5F); // byte string (major type 2), additional-info 31: indefinite length
+    malformed.push(0x5A); // first chunk: byte string, 4-byte length follows
+    malformed.extend_from_slice(&1_000_000_u32.to_be_bytes());
+    // No chunk bytes, no break (0xff): the input ends here.
+    assert!(
+        WrappedContentKey::from_cbor(&malformed).is_err(),
+        "an indefinite-length chunk declaring 1,000,000 bytes with none present must be rejected, not hang or over-allocate"
+    );
+}
+
+/// `from_cbor` must reject a duplicate CBOR map key rather than letting the
+/// second occurrence silently win — an undetected duplicate is the same
+/// class of ambiguity as trailing data: two different byte sequences would
+/// carry the same apparent meaning.
+#[test]
+fn from_cbor_rejects_duplicate_field() {
+    let (_dk, ek) = fresh();
+    let content_key = [0x19u8; CONTENT_KEY_LEN];
+    let valid = seal_for(&content_key, &[ek]).unwrap()[0].to_cbor().unwrap();
+
+    let mut malformed = valid.clone();
+    malformed[0] = 0xA6; // map header: 6 pairs (was 5)
+    let version_pair = malformed[1..10].to_vec(); // "version" key (8 bytes) + its u8 value (1 byte)
+    malformed.splice(10..10, version_pair);
+
+    assert!(
+        matches!(
+            WrappedContentKey::from_cbor(&malformed),
+            Err(SealError::Serialization { .. })
+        ),
+        "a `version` key appearing twice must be rejected, not resolved by last-value-wins"
+    );
+}
+
+/// `from_cbor` must reject an unrecognized CBOR map key rather than
+/// silently ignoring it — an unknown field is an unauthenticated place to
+/// smuggle data that different consumers of the same bytes could disagree
+/// about.
+#[test]
+fn from_cbor_rejects_unknown_field() {
+    let (_dk, ek) = fresh();
+    let content_key = [0x1Au8; CONTENT_KEY_LEN];
+    let valid = seal_for(&content_key, &[ek]).unwrap()[0].to_cbor().unwrap();
+
+    let mut malformed = valid.clone();
+    malformed[0] = 0xA6; // map header: 6 pairs (was 5)
+    malformed.push(0x64); // text string, additional-info 4 ("evil".len())
+    malformed.extend_from_slice(b"evil");
+    malformed.push(0x00); // value: unsigned 0
+
+    assert!(
+        matches!(
+            WrappedContentKey::from_cbor(&malformed),
+            Err(SealError::Serialization { .. })
+        ),
+        "an unrecognized `evil` key on an otherwise-complete envelope must be rejected, not ignored"
     );
 }

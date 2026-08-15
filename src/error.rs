@@ -50,4 +50,23 @@ pub enum SealError {
         /// Failure detail.
         reason: String,
     },
+
+    /// CBOR input exceeded the maximum possible size of a genuine v1
+    /// envelope, rejected before any deserialization was attempted.
+    #[snafu(display("CBOR input is {size} bytes, exceeding the {max}-byte v1 envelope maximum"))]
+    EnvelopeTooLarge {
+        /// The size of the rejected input, in bytes.
+        size: usize,
+        /// The maximum size a genuine v1 envelope can encode to.
+        max: usize,
+    },
+
+    /// CBOR input contained a complete envelope followed by additional
+    /// bytes. The parse boundary must be exact: trailing data would let two
+    /// distinct byte strings decode to the same envelope.
+    #[snafu(display("{trailing} trailing byte(s) followed a complete wrapped content key"))]
+    TrailingData {
+        /// How many bytes followed the decoded envelope.
+        trailing: usize,
+    },
 }
