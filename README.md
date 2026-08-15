@@ -32,7 +32,7 @@ sphragis = { git = "https://github.com/forkwright/sphragis", features = ["previe
 use sphragis::{generate_recipient_keypair, seal_for, unseal};
 
 // Each device holds a keypair; publish the encapsulation (public) key.
-let (dk, ek) = generate_recipient_keypair();
+let (dk, ek) = generate_recipient_keypair()?;
 
 // Seal a content key for a set of devices (one wrap each, same content key).
 let content_key = [0u8; 32];

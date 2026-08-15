@@ -1,5 +1,39 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- `HybridKem::generate` now returns `Result<(DecapsulationKey,
+  EncapsulationKey), SealError>` instead of a bare tuple — **breaking**,
+  taken deliberately before the `preview-pq` API stabilizes (#16).
+- `EncapsulationKey::encapsulate` and `seal_for` now return
+  `SealError::Entropy` if the OS entropy source fails, in addition to their
+  existing error paths.
+
+### Fixed
+
+- OS entropy failure no longer panics (#16). `rand_core` 0.6's
+  `OsRng::fill_bytes` panics on OS-RNG failure; every entropy draw — key
+  generation, encapsulation, and the AEAD nonce inside `seal_for` — now uses
+  `try_fill_bytes` and propagates as the new `SealError::Entropy { source:
+  rand_core::Error, location }`. A recoverable host entropy failure is now a
+  typed, auditable `Result`, not a process abort.
+
+### Added
+
+- `HybridKem::generate_with_rng`, `EncapsulationKey::encapsulate_with_rng`,
+  and `seal_for_with_rng`: the same operations with a caller-supplied
+  `&mut R: RngCore + CryptoRng`, the trait bound `x25519-dalek`'s own
+  `random_from_rng` requires (by reference here, so one RNG's state threads
+  through every draw in a call). The OS RNG cannot be made to fail on demand,
+  so this is what makes the entropy-failure path (above) testable at all —
+  proven in `tests/entropy_failure.rs` with an injected RNG that fails on
+  demand, including mid-batch inside `seal_for_with_rng` (no partial wrap set
+  is ever returned).
+- `rand_core`'s `std` feature (alongside `getrandom`), so `rand_core::Error`
+  implements `std::error::Error` and chains behind `SealError::Entropy`.
+
 ## [0.1.2](https://github.com/forkwright/sphragis/compare/v0.1.1...v0.1.2) (2026-07-29)
 
 
@@ -19,8 +53,6 @@
 
 * resolve all open audit findings (crypto correctness + zeroization) + lint-clean + Tier-U CI ([#5](https://github.com/forkwright/sphragis/issues/5)) ([3ddcf0e](https://github.com/forkwright/sphragis/commit/3ddcf0edbb7b21039edfc75a8e47e345eba54a47))
 * **sphragis:** zeroize HKDF/sha2 digest state via the digest-0.11 generation ([#7](https://github.com/forkwright/sphragis/issues/7)) ([860d7f9](https://github.com/forkwright/sphragis/commit/860d7f95ca4c51868116fa3eabfe9a370a2d37e9))
-
-## [Unreleased]
 
 Audit-hardening pass (issues #1, #3, #4): error propagation, zeroization
 coverage, parse-boundary validation, dependency hygiene, test coverage.

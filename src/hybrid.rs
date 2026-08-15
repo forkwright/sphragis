@@ -25,10 +25,10 @@ use sha3::{Digest, Sha3_256, Shake256};
 use x25519_dalek::{PublicKey as XPublic, StaticSecret as XSecret};
 use zeroize::{Zeroize, Zeroizing};
 
-use rand_core::{OsRng, RngCore};
-use snafu::ensure;
+use rand_core::{CryptoRng, OsRng, RngCore};
+use snafu::{ensure, ResultExt};
 
-use crate::error::{SealError, WrongLengthSnafu};
+use crate::error::{EntropySnafu, SealError, WrongLengthSnafu};
 
 /// X-Wing domain-separation label: ASCII `\.//^\`.
 const X_WING_LABEL: &[u8; 6] = br"\.//^\";
@@ -54,8 +54,8 @@ pub const SHARED_SECRET_LEN: usize = 32; // kanon:ignore RUST/pub-visibility -- 
 /// Internal: without `hazmat`, no operation (`HybridKem::generate`, direct
 /// `encapsulate`/`decapsulate`, `derive_wrap_key` — see sphragis#23) can
 /// produce one, so the alias itself is `pub(crate)`, matching `HybridKem`'s
-/// gating above. `EncapsulationKey::encapsulate_deterministic` (the one
-/// other former source of a `SharedSecret`) is a private method
+/// own `pub(crate)`/`pub` split below. `EncapsulationKey::encapsulate_deterministic`
+/// (the one other former source of a `SharedSecret`) is a private method
 /// (forkwright/sphragis#17), not a public one, so it does not force this
 /// alias to stay reachable.
 #[cfg(not(feature = "hazmat"))]
@@ -138,24 +138,18 @@ impl core::fmt::Debug for DecapsulationKey {
     }
 }
 
-// WHY: the seed is born inside Zeroizing so no bare stack copy ever exists.
-fn generate_impl() -> (DecapsulationKey, EncapsulationKey) {
-    let mut seed = Zeroizing::new([0u8; DECAPSULATION_KEY_LEN]);
-    OsRng.fill_bytes(seed.as_mut_slice());
-    let dk = DecapsulationKey { seed };
-    let ek = dk.encapsulation_key();
-    (dk, ek)
-}
-
 impl HybridKem {
     /// Generates a fresh X-Wing keypair using the OS CSPRNG.
     ///
     /// Internal: [`crate::seal::generate_recipient_keypair`] is the stable
     /// entry point.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SealError::Entropy`] if the OS entropy source fails.
     #[cfg(not(feature = "hazmat"))]
-    #[must_use]
-    pub(crate) fn generate() -> (DecapsulationKey, EncapsulationKey) {
-        generate_impl()
+    pub(crate) fn generate() -> Result<(DecapsulationKey, EncapsulationKey), SealError> {
+        Self::generate_with_rng(&mut OsRng)
     }
 
     /// Generates a fresh X-Wing keypair using the OS CSPRNG.
@@ -163,12 +157,71 @@ impl HybridKem {
     /// HAZMAT: reachable only with the `hazmat` feature — no stability
     /// promise. A normal consumer calls
     /// [`crate::seal::generate_recipient_keypair`] instead.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SealError::Entropy`] if the OS entropy source fails.
     // kanon:ignore RUST/pub-visibility -- hazmat-only primitive surface (sphragis#23): reachable for KAT/conformance testing, feature-gated off the normal public API
     #[cfg(feature = "hazmat")]
-    #[must_use]
-    pub fn generate() -> (DecapsulationKey, EncapsulationKey) {
-        generate_impl()
+    pub fn generate() -> Result<(DecapsulationKey, EncapsulationKey), SealError> {
+        Self::generate_with_rng(&mut OsRng)
     }
+
+    /// Generates a fresh X-Wing keypair from the given CSPRNG.
+    ///
+    /// Internal: no envelope-level equivalent exists — an injectable RNG is
+    /// a primitive/conformance-testing affordance (proves the entropy-typed
+    /// error path, sphragis#16), not something a normal consumer needs;
+    /// [`crate::seal::generate_recipient_keypair`] always draws fresh OS
+    /// randomness.
+    ///
+    /// WHY: isolates the entropy source behind an injectable seam. `OsRng`'s
+    /// infallible `fill_bytes` panics on OS-RNG failure (`rand_core` 0.6
+    /// `os.rs`); a generic caller-supplied `rng` lets tests substitute a
+    /// deterministically-failing source and prove the typed-error path
+    /// without depending on the real OS RNG ever failing.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SealError::Entropy`] if `rng` fails to supply randomness.
+    #[cfg(not(feature = "hazmat"))]
+    pub(crate) fn generate_with_rng<R: RngCore + CryptoRng>(
+        rng: &mut R,
+    ) -> Result<(DecapsulationKey, EncapsulationKey), SealError> {
+        generate_with_rng_impl(rng)
+    }
+
+    /// Generates a fresh X-Wing keypair from the given CSPRNG.
+    ///
+    /// HAZMAT: reachable only with the `hazmat` feature — no stability
+    /// promise. See [`generate`](Self::generate)'s doc comment for the
+    /// entropy-source rationale; `tests/entropy_failure.rs` is the consumer
+    /// (sphragis#16).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SealError::Entropy`] if `rng` fails to supply randomness.
+    // kanon:ignore RUST/pub-visibility -- hazmat-only primitive surface (sphragis#23): reachable for KAT/conformance testing, feature-gated off the normal public API
+    #[cfg(feature = "hazmat")]
+    pub fn generate_with_rng<R: RngCore + CryptoRng>(
+        rng: &mut R,
+    ) -> Result<(DecapsulationKey, EncapsulationKey), SealError> {
+        generate_with_rng_impl(rng)
+    }
+}
+
+// WHY: the seed is born inside Zeroizing so no bare stack copy ever exists;
+// on entropy failure the partially/un-filled buffer is dropped (zeroized)
+// here and no key is returned.
+fn generate_with_rng_impl<R: RngCore + CryptoRng>(
+    rng: &mut R,
+) -> Result<(DecapsulationKey, EncapsulationKey), SealError> {
+    let mut seed = Zeroizing::new([0u8; DECAPSULATION_KEY_LEN]);
+    rng.try_fill_bytes(seed.as_mut_slice())
+        .context(EntropySnafu)?;
+    let dk = DecapsulationKey { seed };
+    let ek = dk.encapsulation_key();
+    Ok((dk, ek))
 }
 
 impl DecapsulationKey {
@@ -270,43 +323,78 @@ impl DecapsulationKey {
 impl EncapsulationKey {
     /// Encapsulates to this public key, returning `(ciphertext, shared_secret)`.
     ///
-    /// Internal: [`crate::seal::seal_for`] is the stable entry point.
-    ///
-    /// Uses the OS CSPRNG. Ciphertext wire form is `ML-KEM ct || X25519 ct`.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`SealError::WrongLength`] if the ML-KEM message seed cannot be
-    /// formed from the sampled randomness (unreachable for a well-formed
-    /// 64-byte buffer; propagated rather than silently defaulted).
-    #[cfg(not(feature = "hazmat"))]
-    pub(crate) fn encapsulate(&self) -> Result<(Vec<u8>, SharedSecret), SealError> {
-        self.encapsulate_impl()
-    }
-
-    /// Encapsulates to this public key, returning `(ciphertext, shared_secret)`.
-    ///
     /// HAZMAT: reachable only with the `hazmat` feature, for known-answer
     /// testing only — no stability promise. A normal consumer calls
-    /// [`crate::seal::seal_for`] instead, which encapsulates internally.
+    /// [`crate::seal::seal_for`] instead: it does not route through this
+    /// fixed-OsRng convenience wrapper, since [`crate::seal::seal_for_with_rng`]
+    /// is itself generic over the RNG and calls
+    /// [`encapsulate_with_rng`](Self::encapsulate_with_rng) directly — so
+    /// without `hazmat` this method would have no caller in the crate at all
+    /// (`dead_code`, denied under `-D warnings`) and is not compiled.
     ///
     /// Uses the OS CSPRNG. Ciphertext wire form is `ML-KEM ct || X25519 ct`.
     ///
     /// # Errors
     ///
-    /// Returns [`SealError::WrongLength`] if the ML-KEM message seed cannot be
-    /// formed from the sampled randomness (unreachable for a well-formed
-    /// 64-byte buffer; propagated rather than silently defaulted).
+    /// Returns [`SealError::Entropy`] if the OS entropy source fails, or
+    /// [`SealError::WrongLength`] if the ML-KEM message seed cannot be formed
+    /// from the sampled randomness (unreachable for a well-formed 64-byte
+    /// buffer; propagated rather than silently defaulted).
     // kanon:ignore RUST/pub-visibility -- hazmat-only primitive surface (sphragis#23): reachable for KAT/conformance testing, feature-gated off the normal public API
     #[cfg(feature = "hazmat")]
     pub fn encapsulate(&self) -> Result<(Vec<u8>, SharedSecret), SealError> {
-        self.encapsulate_impl()
+        self.encapsulate_with_rng(&mut OsRng)
     }
 
-    fn encapsulate_impl(&self) -> Result<(Vec<u8>, SharedSecret), SealError> {
-        let mut rnd = Zeroizing::new([0u8; 64]);
-        OsRng.fill_bytes(rnd.as_mut_slice());
-        self.encapsulate_deterministic(&rnd)
+    /// Encapsulates to this public key using the given CSPRNG.
+    ///
+    /// Internal: no envelope-level equivalent exists — an injectable RNG is
+    /// a primitive/conformance-testing affordance (proves the entropy-typed
+    /// error path, sphragis#16), not something a normal consumer needs;
+    /// [`crate::seal::seal_for`] always draws fresh OS randomness. WHY: see
+    /// [`HybridKem::generate_with_rng`] — same injectable-entropy seam, so a
+    /// failing `rng` proves this call site returns [`SealError::Entropy`]
+    /// rather than panicking.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SealError::Entropy`] if `rng` fails, or
+    /// [`SealError::WrongLength`] per [`Self::encapsulate_deterministic`].
+    #[cfg(not(feature = "hazmat"))]
+    pub(crate) fn encapsulate_with_rng<R: RngCore + CryptoRng>(
+        &self,
+        rng: &mut R,
+    ) -> Result<(Vec<u8>, SharedSecret), SealError> {
+        self.encapsulate_with_rng_impl(rng)
+    }
+
+    /// Encapsulates to this public key using the given CSPRNG.
+    ///
+    /// HAZMAT: reachable only with the `hazmat` feature — no stability
+    /// promise. See [`HybridKem::generate_with_rng`] for the entropy-source
+    /// rationale; `tests/entropy_failure.rs` is the consumer (sphragis#16).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SealError::Entropy`] if `rng` fails, or
+    /// [`SealError::WrongLength`] per [`Self::encapsulate_deterministic`].
+    // kanon:ignore RUST/pub-visibility -- hazmat-only primitive surface (sphragis#23): reachable for KAT/conformance testing, feature-gated off the normal public API
+    #[cfg(feature = "hazmat")]
+    pub fn encapsulate_with_rng<R: RngCore + CryptoRng>(
+        &self,
+        rng: &mut R,
+    ) -> Result<(Vec<u8>, SharedSecret), SealError> {
+        self.encapsulate_with_rng_impl(rng)
+    }
+
+    fn encapsulate_with_rng_impl<R: RngCore + CryptoRng>(
+        &self,
+        rng: &mut R,
+    ) -> Result<(Vec<u8>, SharedSecret), SealError> {
+        let mut randomness = Zeroizing::new([0u8; 64]);
+        rng.try_fill_bytes(randomness.as_mut_slice())
+            .context(EntropySnafu)?;
+        self.encapsulate_deterministic(&randomness)
     }
 
     /// Deterministic encapsulation from 64 bytes of randomness (first 32 → ML-KEM

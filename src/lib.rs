@@ -23,15 +23,15 @@
 //!
 //! The stable contract is the versioned envelope:
 //! [`generate_recipient_keypair`](seal::generate_recipient_keypair),
-//! [`seal_for`], [`unseal`], [`RecipientId`], [`WrappedContentKey`]. The
-//! generic hybrid-KEM primitive underneath it (`HybridKem`, a raw
-//! `SharedSecret`, direct encaps/decaps, `derive_wrap_key`) is reachable only
-//! with the `hazmat` feature, for known-answer/conformance testing — no
-//! stability promise, and no migration promise: `DECISION.md` records why the
-//! local X-Wing combiner exists (upstream is pre-release) and what gates
-//! swapping it for a stable, audited upstream implementation. That swap
-//! changes `src/hybrid.rs` alone; this profile's API and wire contract do
-//! not move.
+//! [`seal_for`], [`seal_for_with_rng`], [`unseal`], [`RecipientId`],
+//! [`WrappedContentKey`]. The generic hybrid-KEM primitive underneath it
+//! (`HybridKem`, a raw `SharedSecret`, direct encaps/decaps,
+//! `derive_wrap_key`) is reachable only with the `hazmat` feature, for
+//! known-answer/conformance testing — no stability promise, and no
+//! migration promise: `DECISION.md` records why the local X-Wing combiner
+//! exists (upstream is pre-release) and what gates swapping it for a
+//! stable, audited upstream implementation. That swap changes
+//! `src/hybrid.rs` alone; this profile's API and wire contract do not move.
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(missing_docs)]
@@ -53,7 +53,8 @@ pub use hybrid::{DecapsulationKey, EncapsulationKey};
 pub use hybrid::{HybridKem, SharedSecret};
 #[cfg(feature = "preview-pq")]
 pub use seal::{
-    generate_recipient_keypair, seal_for, unseal, RecipientId, WrappedContentKey, CONTENT_KEY_LEN,
+    generate_recipient_keypair, seal_for, seal_for_with_rng, unseal, RecipientId,
+    WrappedContentKey, CONTENT_KEY_LEN,
 };
 
 /// Wire-format version for the v1 sealing construction.

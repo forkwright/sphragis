@@ -354,7 +354,7 @@ fn x25519_rfc7748_vector_1() {
 // ---------------------------------------------------------------------------
 
 fn fresh() -> (DecapsulationKey, EncapsulationKey) {
-    HybridKem::generate()
+    HybridKem::generate().unwrap()
 }
 
 /// A content key seals and unseals through a single recipient.

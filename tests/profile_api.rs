@@ -19,7 +19,7 @@ use sphragis::{generate_recipient_keypair, seal_for, unseal, CONTENT_KEY_LEN};
 )]
 #[test]
 fn generate_seal_unseal_round_trip_without_hazmat() {
-    let (dk, ek) = generate_recipient_keypair();
+    let (dk, ek) = generate_recipient_keypair().unwrap();
     let content_key = [0x42u8; CONTENT_KEY_LEN];
 
     let wrapped = seal_for(&content_key, &[ek]).unwrap();
@@ -37,8 +37,8 @@ fn generate_seal_unseal_round_trip_without_hazmat() {
 )]
 #[test]
 fn independently_generated_keypairs_do_not_cross_unseal() {
-    let (_dk1, ek1) = generate_recipient_keypair();
-    let (dk2, _ek2) = generate_recipient_keypair();
+    let (_dk1, ek1) = generate_recipient_keypair().unwrap();
+    let (dk2, _ek2) = generate_recipient_keypair().unwrap();
     let content_key = [0x24u8; CONTENT_KEY_LEN];
 
     let wrapped = seal_for(&content_key, &[ek1]).unwrap();
