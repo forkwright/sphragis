@@ -14,6 +14,17 @@
     clippy::unwrap_used,
     reason = "test harness: a failed unwrap on setup data IS the test failure"
 )]
+#![expect(
+    clippy::expect_used,
+    reason = "CountdownRng::fill_bytes deliberately panics via expect() — it mirrors OsRng's real \
+              panicking behavior on failure, so a production call site that regressed onto \
+              fill_bytes (instead of try_fill_bytes) fails loudly here instead of silently"
+)]
+#![expect(
+    clippy::panic,
+    reason = "test harness: an unmatched error variant or unmet assertion IS the test failure, \
+              surfaced via panic! the same way assert!/assert_eq! do internally"
+)]
 
 use rand_core::{CryptoRng, Error as RngError, RngCore};
 
@@ -184,10 +195,9 @@ fn seal_for_with_rng_emits_no_partial_wraps_across_recipients() {
     let mut rng = CountdownRng::succeeds(2);
     let result = seal_for_with_rng(&content_key, &[ek1, ek2], &mut rng);
 
-    match &result {
-        Err(SealError::Entropy { .. }) => {}
-        _ => panic!(
+    let Err(SealError::Entropy { .. }) = &result else {
+        panic!(
             "a mid-batch entropy failure must surface as SealError::Entropy with no wraps, got {result:?}"
-        ),
-    }
+        );
+    };
 }
