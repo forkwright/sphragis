@@ -95,15 +95,25 @@ sealed    = ChaCha20-Poly1305(key=wrap_key, nonce=random12,
                               pt=content_key[32])
 ```
 
-`WrappedContentKey` (CBOR, ciborium — matches akroasis serialization):
+`WrappedContentKey` (CBOR, ciborium — matches akroasis serialization). Every
+byte-blob field carries `#[serde(with = "serde_bytes")]`, so it wire-encodes as
+a single CBOR byte string rather than an array of per-byte integers:
 
 | Field | Type | Notes |
 |---|---|---|
 | `version` | `u8` | 1; future protocol changes increment, never silent |
-| `recipient_id` | `[u8; 32]` | BLAKE3 of the recipient X-Wing encapsulation key |
-| `kem_ciphertext` | `[u8; 1120]` | X-Wing ciphertext (ML-KEM ct 1088 \|\| X25519 ct 32) |
+| `recipient_id` | `RecipientId([u8; 32])` | BLAKE3 of the recipient X-Wing encapsulation key |
+| `kem_ciphertext` | `Vec<u8>`, exactly 1120 | X-Wing ciphertext (ML-KEM ct 1088 \|\| X25519 ct 32) |
 | `aead_nonce` | `[u8; 12]` | random per wrap |
-| `sealed_key` | `Vec<u8>` | ChaCha20-Poly1305(content_key) = 32 + 16 tag |
+| `sealed_key` | `Vec<u8>`, exactly 48 | ChaCha20-Poly1305(content_key) = 32 + 16 tag |
+
+`from_cbor` bounds the parse boundary before trusting any field: input above a
+size derived from these lengths is rejected before deserializing, unknown or
+duplicate map keys are rejected rather than ignored or last-value-wins, and
+decoding fails unless every supplied byte belongs to exactly one top-level
+value — a decoder that accepts trailing bytes lets two different byte strings
+mean the same envelope, which breaks canonicity for anything that hashes,
+signs, or frames the sealed bytes (sphragis#15).
 
 Key-wrapping choice — **ChaCha20-Poly1305, not AES-KW**:
 - AES-KW (RFC 3394) has no nonce and no AAD; it cannot bind the recipient-id /
