@@ -12,6 +12,13 @@ is behind the `preview-pq` feature (unaudited).
 - `src/envelope.rs` — HKDF-SHA256 + ChaCha20-Poly1305 envelope
 - `src/seal.rs` — `seal_for` / `unseal` multi-recipient API, `WrappedContentKey`
 - `src/error.rs` — `SealError`
-- `tests/known_answer_vectors.rs` — X-Wing KAT + RFC KATs + round-trip + negatives
+- `tests/known_answer_vectors.rs` — X-Wing KAT + FIPS-203 ML-KEM-768 ACVP KAT +
+  RFC KATs + round-trip + negatives
+- `tests/provenance_lock.rs` — enforces `crypto-provenance.toml` against
+  `Cargo.lock` and the vendored vector files
+- `tests/vectors/` — vendored, hash-locked upstream vector fixtures (X-Wing
+  draft, ML-KEM-768 ACVP keygen/encapDecap)
+- `crypto-provenance.toml` — SSOT for every KAT's standard revision, source
+  URL, vector hash, and locked dependency version. Read this, not `Cargo.toml`
+  or `DECISION.md`, for current dependency-version facts.
 - `DECISION.md` — full design rationale
-- `Cargo.toml` — dependency versions (ml-kem 0.3.2, x25519-dalek 2.0.1, etc.)

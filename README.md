@@ -56,6 +56,12 @@ fresh content key for forward secrecy, or the same one for a cheap revoke).
 cargo test --features preview-pq
 ```
 
+Every known-answer test's standard revision, vector source, source hash, and
+locked dependency version are declared in
+[`crypto-provenance.toml`](crypto-provenance.toml) and enforced by
+`tests/provenance_lock.rs` — a `cargo update` that moves a locked crypto
+dependency, or an edit to a vendored vector fixture, fails the gate.
+
 ## Why hybrid, not PQ-only
 
 ML-KEM-768 alone places all trust in a 2024-vintage primitive and its pre-1.0
