@@ -310,7 +310,7 @@ fn chacha20poly1305_rfc8439_2_8_2() {
         "ChaCha20-Poly1305 open must recover the RFC 8439 §2.8.2 plaintext"
     );
 
-    let mut tampered = sealed.clone();
+    let mut tampered = sealed;
     let last = tampered.len() - 1;
     tampered[last] ^= 0xFF;
     assert!(
