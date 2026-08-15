@@ -18,7 +18,13 @@ src/
   seal.rs      — multi-recipient WrappedContentKey sealing API
   error.rs     — SealError (snafu)
 tests/
-  known_answer_vectors.rs — X-Wing KAT, RFC KATs, round-trip, negatives
+  known_answer_vectors.rs — X-Wing KAT, FIPS-203 ML-KEM-768 ACVP KAT, RFC KATs,
+                             round-trip, negatives
+  provenance_lock.rs      — enforces crypto-provenance.toml against Cargo.lock
+                             and the vendored vector files
+  vectors/                — vendored, hash-locked upstream vector fixtures
+crypto-provenance.toml — SSOT: standard revision / source URL / vector hash /
+                          locked dependency version per KAT
 DECISION.md    — full rationale: why hybrid, why X-Wing, why this envelope
 ```
 

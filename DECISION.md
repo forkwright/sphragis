@@ -184,15 +184,25 @@ call-site clash.
 
 ## 7. Acceptance gate (KATs)
 
-Behind `preview-pq`, the test suite is the acceptance gate:
-- X-Wing draft KAT vector (full hybrid encaps→decaps→shared-secret), from the
-  RustCrypto x-wing `test-vectors.json` (draft-06).
-- FIPS-203 / NIST ACVP ML-KEM-768 known-answer (primitive correctness).
+Behind `preview-pq`, the test suite is the acceptance gate. Which standard
+revision, which vector, which vendored/hash-checked source, and which
+dependency version each KAT is bound to is **machine-readable** in
+[`crypto-provenance.toml`](crypto-provenance.toml) — read there, not here,
+and never restate a revision number or vector source in prose again: a
+sentence naming a draft revision cannot be checked and drifts silently
+(the exact failure mode `crypto-provenance.toml` + `tests/provenance_lock.rs`
+replace). In outline, the gate executes:
+- X-Wing draft KAT (full hybrid keypair, ciphertext, and shared secret).
+- FIPS-203 ML-KEM-768 ACVP KAT (keygen, encapsulation, decapsulation).
 - RFC 7748 §5.2 X25519 KAT.
 - RFC 5869 HKDF-SHA256 KAT.
-- RFC 8439 §2.8.2 ChaCha20-Poly1305 KAT.
+- RFC 8439 §2.8.2 ChaCha20-Poly1305 KAT (full AEAD).
 - Negative tests: wrong recipient, wrong domain tag, corrupted KEM ciphertext,
   corrupted sealed key, unsupported version.
+- `tests/provenance_lock.rs`: every dependency above resolves to the version
+  its vector was verified against, and every vendored vector file matches its
+  recorded hash — a `cargo update` or a hand-edited fixture fails the gate
+  instead of drifting past it.
 
 ## 8. Unverified / preview status
 

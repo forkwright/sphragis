@@ -1,0 +1,188 @@
+# Machine-readable cryptographic provenance lock for the sphragis acceptance
+# gate (`cargo test --features preview-pq`).
+#
+# WHY: a prose provenance claim (a sentence naming a draft revision) can drift
+# silently — nothing fails when the cited revision stops being current, or
+# when the vendored vector bytes stop matching what the sentence claims. This
+# file is the SSOT for what standard each construction is bound to, which
+# vector proves it, and which dependency version that vector was verified
+# against. `tests/provenance_lock.rs` executes every check below; a human or
+# agent editing a `locked_version` or `source_sha256` field without also
+# updating the corresponding test is the failure this file exists to catch.
+#
+# Do not hand-restate any of these facts in DECISION.md / README.md / llms.txt
+# — point at this file instead.
+
+[review_policy]
+trigger = """
+Any of the following requires re-deriving and re-vendoring the affected
+vector(s) against the new source, updating this file's source_sha256 /
+locked_version / revision fields, and confirming the corresponding test in
+tests/known_answer_vectors.rs still asserts full construction output (not
+just a shared secret) — before merge, not after:
+  1. `cargo update` changes the resolved version of any crate listed under
+     [[dependency]] below.
+  2. The X-Wing draft (draft-connolly-cfrg-xwing-kem) publishes a revision
+     whose Appendix G change log records a change to the Combiner or
+     ExpandDecapsulationKey definitions (not every revision bump requires
+     this — most are editorial; see the `notes` field on the x-wing
+     [[standard]] entry for the last-verified stability window).
+  3. X-Wing is adopted as an RFC (revision becomes immutable; update
+     `revision` and `source_url` to the RFC, drop the draft-instability
+     framing from `notes`).
+"""
+enforced_by = "tests/provenance_lock.rs — asserts every [[dependency]].locked_version equals the version actually resolved in Cargo.lock, and every vendored [[vector]].vendored_file's sha256 equals its recorded source_sha256."
+
+# ---------------------------------------------------------------------------
+# Standards. Each construction sphragis implements traces to exactly one of
+# these. RFCs and the FIPS publication are immutable once published — citing
+# a revision is a permanent, unambiguous binding. The X-Wing draft is NOT
+# immutable: IETF drafts are replaced in place under the same base name each
+# revision, which is the exact failure this lock exists to catch (see `notes`).
+# ---------------------------------------------------------------------------
+
+[[standard]]
+id = "x-wing"
+name = "X-Wing hybrid KEM (X25519 + ML-KEM-768)"
+revision = "draft-connolly-cfrg-xwing-kem-10"
+source_url = "https://www.ietf.org/archive/id/draft-connolly-cfrg-xwing-kem-10.txt"
+active_as_of = "2026-03-02"
+notes = """
+Not an RFC yet — draft revisions mutate the same base name in place, so a
+prose citation of one revision number silently goes stale as later revisions
+publish (this is the defect this lock replaces). The Combiner and
+ExpandDecapsulationKey byte-level definitions have been stable since -05
+through -10 per the draft's own Appendix G change log: -05 moved the domain
+label to the end of the combiner and switched seed-stretching to a 96-byte
+SHAKE-256 squeeze (G.4, "this does not have any security or performance
+effects"); -06→-07 changed only how the spec TEXT requests SHAKE-256 output
+(bits vs bytes — 96 bytes either way, no behavior change, G.2); -07 through
+-10 changed only ASN.1/PEM/HPKE/TLS codepoint registration text and
+implementation-notes prose (G.1-G.3). sphragis's `hybrid::expand` and
+`hybrid::combine` match the -10 (current) definitions byte-for-byte, verified
+against this repo's own dependency (`ml-kem` 0.3.2's `Seed = Array<u8, U64>`
++ `DecapsulationKey::from_seed` splitting d||z per FIPS 203
+KeyGen_internal(d, z)) and against the published KAT (see xwing-kat-0 below).
+Re-verify this stability claim before binding to any future revision beyond
+-10 — do not assume it continues to hold.
+"""
+
+[[standard]]
+id = "ml-kem-768"
+name = "ML-KEM-768"
+revision = "FIPS 203 (2024-08-13, NIST FIPS PUB 203, final)"
+source_url = "https://csrc.nist.gov/pubs/fips/203/final"
+
+[[standard]]
+id = "x25519"
+name = "X25519 (Curve25519 ECDH)"
+revision = "RFC 7748"
+source_url = "https://www.rfc-editor.org/rfc/rfc7748"
+
+[[standard]]
+id = "hkdf-sha256"
+name = "HKDF-SHA256"
+revision = "RFC 5869"
+source_url = "https://www.rfc-editor.org/rfc/rfc5869"
+
+[[standard]]
+id = "chacha20poly1305"
+name = "ChaCha20-Poly1305 AEAD"
+revision = "RFC 8439"
+source_url = "https://www.rfc-editor.org/rfc/rfc8439"
+
+# ---------------------------------------------------------------------------
+# Vectors. Every entry here MUST have a corresponding executed assertion in
+# tests/known_answer_vectors.rs (`executed_by`). Vendored vectors are
+# committed verbatim, byte-for-byte, from the cited upstream commit — never
+# hand-trimmed or re-typed — so `source_sha256` is checkable both against the
+# vendored file on disk (tests/provenance_lock.rs does this) and against a
+# fresh fetch of `origin_url` at any time.
+# ---------------------------------------------------------------------------
+
+[[vector]]
+id = "xwing-kat-0"
+standard = "x-wing"
+origin_url = "https://github.com/dconnolly/draft-connolly-cfrg-xwing-kem/blob/main/spec/test-vectors.json"
+vendored_from = "https://github.com/RustCrypto/KEMs/blob/bd482f292dedc95002eca3aa35e26222f0cb1064/x-wing/tests/test-vectors.json"
+vendored_file = "tests/vectors/xwing-draft-connolly-test-vectors.json"
+source_sha256 = "a8726596f4c7629590f727b1bbeb483f6932292fbf5fd85c9cbb803190014f00"
+executed_by = "tests/known_answer_vectors.rs::xwing_draft_kat_vector_0"
+asserts = ["seed -> decapsulation key (sk)", "encapsulation key (pk)", "ciphertext (ct)", "shared secret (ss), send and receive side"]
+
+[[vector]]
+id = "mlkem768-keygen-acvp"
+standard = "ml-kem-768"
+origin_url = "https://github.com/usnistgov/ACVP-Server/tree/65370b861b96efd30dfe0daae607bde26a78a5c8/gen-val/json-files/ML-KEM-keyGen-FIPS203"
+vendored_from = "https://raw.githubusercontent.com/usnistgov/ACVP-Server/65370b861b96efd30dfe0daae607bde26a78a5c8/gen-val/json-files/ML-KEM-keyGen-FIPS203/internalProjection.json"
+vendored_file = "tests/vectors/mlkem-fips203-keygen-acvp.json"
+source_sha256 = "0fdca41ed30f49c828af80c73a6424ece3accc1e3430ae14492363aaadeb0e48"
+executed_by = "tests/known_answer_vectors.rs::mlkem768_fips203_keygen_from_seed_acvp"
+asserts = ["(d, z) seed -> encapsulation key (ek)"]
+notes = "ML-KEM-768 group (tgId=2), tcId=26. Same upstream commit the `ml-kem` crate's own tests/README.md cites."
+
+[[vector]]
+id = "mlkem768-encapdecap-acvp"
+standard = "ml-kem-768"
+origin_url = "https://github.com/usnistgov/ACVP-Server/tree/65370b861b96efd30dfe0daae607bde26a78a5c8/gen-val/json-files/ML-KEM-encapDecap-FIPS203"
+vendored_from = "https://raw.githubusercontent.com/usnistgov/ACVP-Server/65370b861b96efd30dfe0daae607bde26a78a5c8/gen-val/json-files/ML-KEM-encapDecap-FIPS203/internalProjection.json"
+vendored_file = "tests/vectors/mlkem-fips203-encapdecap-acvp.json"
+source_sha256 = "4b5afd6c7075b1ffebc099a70dcf907b189daadd42921223127732e3ec83c333"
+executed_by = "tests/known_answer_vectors.rs::mlkem768_fips203_encapsulate_deterministic_acvp, tests/known_answer_vectors.rs::mlkem768_fips203_decapsulate_acvp"
+asserts = ["encapsulation key (ek) + randomness (m) -> ciphertext (c) + shared secret (k)", "expanded decapsulation key (dk) + ciphertext (c) -> shared secret (k)"]
+notes = "ML-KEM-768 AFT group (tgId=2), tcId=26 — self-contained (ek, dk, m, c, k for one keypair)."
+
+[[vector]]
+id = "x25519-rfc7748-5.2-vector-1"
+standard = "x25519"
+origin_url = "https://www.rfc-editor.org/rfc/rfc7748"
+source_sha256 = "279ca0ecc5e92e2962e27b846986aeb74729d9dd34bd4a04a362f80dcb596ad3"
+executed_by = "tests/known_answer_vectors.rs::x25519_rfc7748_vector_1"
+notes = "RFC text not vendored (immutable once published; the vector is 3 x 32 bytes, inlined directly). source_sha256 is an audit reference for re-verifying against a fresh fetch, not a file this repo checks automatically."
+
+[[vector]]
+id = "hkdf-sha256-rfc5869-case-1"
+standard = "hkdf-sha256"
+origin_url = "https://www.rfc-editor.org/rfc/rfc5869"
+source_sha256 = "7a40eb3835b35fc947eb12a2ed614db079d43b26e50dbc537c31fba16397089c"
+executed_by = "tests/known_answer_vectors.rs::hkdf_sha256_rfc5869_case_1"
+notes = "RFC Appendix A.1, Test Case 1. RFC text not vendored; see x25519 entry above for why."
+
+[[vector]]
+id = "chacha20poly1305-rfc8439-2.8.2"
+standard = "chacha20poly1305"
+origin_url = "https://www.rfc-editor.org/rfc/rfc8439"
+source_sha256 = "25bef70fbf7a07ff45c2fe4cb7c6ce954eac687413d8610603268b4e4415324c"
+executed_by = "tests/known_answer_vectors.rs::chacha20poly1305_rfc8439_2_8_2"
+notes = "RFC section 2.8.2. RFC text not vendored; see x25519 entry above for why. Bytes were extracted from the raw RFC text programmatically (byte-offset table parse), not hand-transcribed."
+
+# ---------------------------------------------------------------------------
+# Dependencies. `locked_version` is the version every vector above was
+# verified against; tests/provenance_lock.rs asserts it against the version
+# Cargo.lock actually resolves. A `cargo update` that moves any of these
+# without a corresponding vector re-verification fails the gate.
+# ---------------------------------------------------------------------------
+
+[[dependency]]
+crate = "ml-kem"
+locked_version = "0.3.2"
+
+[[dependency]]
+crate = "x25519-dalek"
+locked_version = "2.0.1"
+
+[[dependency]]
+crate = "sha3"
+locked_version = "0.11.0"
+
+[[dependency]]
+crate = "sha2"
+locked_version = "0.11.0"
+
+[[dependency]]
+crate = "hkdf"
+locked_version = "0.13.0"
+
+[[dependency]]
+crate = "chacha20poly1305"
+locked_version = "0.10.1"
