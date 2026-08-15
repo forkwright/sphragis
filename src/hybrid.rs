@@ -54,8 +54,8 @@ pub const SHARED_SECRET_LEN: usize = 32; // kanon:ignore RUST/pub-visibility -- 
 /// Internal: without `hazmat`, no operation (`HybridKem::generate`, direct
 /// `encapsulate`/`decapsulate`, `derive_wrap_key` — see sphragis#23) can
 /// produce one, so the alias itself is `pub(crate)`, matching `HybridKem`'s
-/// gating above. `EncapsulationKey::encapsulate_deterministic` (the one
-/// other former source of a `SharedSecret`) is a private method
+/// own `pub(crate)`/`pub` split below. `EncapsulationKey::encapsulate_deterministic`
+/// (the one other former source of a `SharedSecret`) is a private method
 /// (forkwright/sphragis#17), not a public one, so it does not force this
 /// alias to stay reachable.
 #[cfg(not(feature = "hazmat"))]
