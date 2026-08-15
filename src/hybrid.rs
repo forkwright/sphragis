@@ -7,6 +7,15 @@
 //! public key, under the X-Wing domain label.
 //!
 //! WARNING: unaudited. Validated against the X-Wing draft known-answer vectors.
+//!
+//! INVARIANT: this module is the primitive side of the envelope seam
+//! (sphragis#23). [`EncapsulationKey`]/[`DecapsulationKey`] are the stable,
+//! always-public identity types [`crate::seal::seal_for`]/
+//! [`crate::seal::unseal`] operate on; everything that performs a raw KEM
+//! operation on them (`HybridKem`, `SharedSecret`, direct encaps/decaps) is
+//! reachable only with the `hazmat` feature. Migrating the combiner to a
+//! stable, audited upstream X-Wing crate means editing this module alone —
+//! `seal.rs`'s calls and the public identity types do not change.
 
 use ml_kem::array::Array;
 use ml_kem::kem::{Decapsulate, Key, KeyExport};
@@ -41,12 +50,47 @@ pub const DECAPSULATION_KEY_LEN: usize = 32; // kanon:ignore RUST/pub-visibility
 pub const SHARED_SECRET_LEN: usize = 32; // kanon:ignore RUST/pub-visibility -- public constant in the SharedSecret alias
 
 /// A hybrid shared secret. Zeroized on drop.
-pub type SharedSecret = Zeroizing<[u8; SHARED_SECRET_LEN]>; // kanon:ignore RUST/pub-visibility -- re-exported in lib.rs
+///
+/// The alias name stays reachable at `sphragis::hybrid::SharedSecret` even
+/// without `hazmat` — [`EncapsulationKey::encapsulate_deterministic`] (a
+/// pre-existing `#[doc(hidden)]` KAT-only method, unrelated to sphragis#23)
+/// returns it unconditionally, so narrowing this alias's own visibility
+/// would leak it through that method's signature instead
+/// (`private_interfaces`, denied under `-D warnings`). This is inert: no
+/// operation reachable without `hazmat` (`HybridKem::generate`, direct
+/// `encapsulate`/`decapsulate`, `derive_wrap_key` — see sphragis#23) can
+/// produce a real X-Wing-derived value of it, and `Zeroizing<[u8; 32]>` — the
+/// type this aliases — carries no capability a consumer could not already
+/// construct directly from the public `zeroize` crate.
+pub type SharedSecret = Zeroizing<[u8; SHARED_SECRET_LEN]>; // kanon:ignore RUST/pub-visibility -- re-exported in lib.rs under hazmat only (sphragis#23); stays reachable via the hybrid module path regardless, see doc comment above
 
 type MlKemDk = ml_kem::DecapsulationKey<MlKem768>;
 type MlKemEk = ml_kem::EncapsulationKey<MlKem768>;
 
+/// The X-Wing hybrid KEM over X25519 + ML-KEM-768. Internal: a normal
+/// consumer calls [`crate::seal::generate_recipient_keypair`] instead of
+/// naming this type — see sphragis#23 (envelope-vs-primitive API boundary).
+///
+/// Without `hazmat`, `HybridKem` is not exported from the crate root or
+/// `hybrid` module — a downstream consumer cannot name it:
+///
+/// ```compile_fail
+/// # fn _f() -> Result<(), Box<dyn std::error::Error>> {
+/// let _ = sphragis::HybridKem::generate(); // unresolved: not exported without `hazmat`
+/// # Ok(())
+/// # }
+/// ```
+#[cfg(not(feature = "hazmat"))]
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct HybridKem;
 /// The X-Wing hybrid KEM over X25519 + ML-KEM-768.
+///
+/// HAZMAT: the generic hybrid-KEM primitive, reachable only with the
+/// `hazmat` feature — no stability promise, and no upstream-adapter
+/// migration promise either (see `DECISION.md`). A normal consumer calls
+/// [`crate::seal::generate_recipient_keypair`] instead.
+// kanon:ignore RUST/pub-visibility -- hazmat-only primitive surface (sphragis#23): re-exported for KAT/conformance testing, feature-gated off the normal public API
+#[cfg(feature = "hazmat")]
 #[derive(Clone, Copy, Debug)]
 pub struct HybridKem;
 
@@ -75,16 +119,34 @@ impl core::fmt::Debug for DecapsulationKey {
     }
 }
 
+// WHY: the seed is born inside Zeroizing so no bare stack copy ever exists.
+fn generate_impl() -> (DecapsulationKey, EncapsulationKey) {
+    let mut seed = Zeroizing::new([0u8; DECAPSULATION_KEY_LEN]);
+    OsRng.fill_bytes(seed.as_mut_slice());
+    let dk = DecapsulationKey { seed };
+    let ek = dk.encapsulation_key();
+    (dk, ek)
+}
+
 impl HybridKem {
+    /// Generates a fresh X-Wing keypair using the OS CSPRNG. Internal:
+    /// [`crate::seal::generate_recipient_keypair`] is the stable entry point.
+    #[cfg(not(feature = "hazmat"))]
+    #[must_use]
+    pub(crate) fn generate() -> (DecapsulationKey, EncapsulationKey) {
+        generate_impl()
+    }
+
     /// Generates a fresh X-Wing keypair using the OS CSPRNG.
-    // WHY: the seed is born inside Zeroizing so no bare stack copy ever exists.
+    ///
+    /// HAZMAT: reachable only with the `hazmat` feature — no stability
+    /// promise. A normal consumer calls
+    /// [`crate::seal::generate_recipient_keypair`] instead.
+    // kanon:ignore RUST/pub-visibility -- hazmat-only primitive surface (sphragis#23): reachable for KAT/conformance testing, feature-gated off the normal public API
+    #[cfg(feature = "hazmat")]
     #[must_use]
     pub fn generate() -> (DecapsulationKey, EncapsulationKey) {
-        let mut seed = Zeroizing::new([0u8; DECAPSULATION_KEY_LEN]);
-        OsRng.fill_bytes(seed.as_mut_slice());
-        let dk = DecapsulationKey { seed };
-        let ek = dk.encapsulation_key();
-        (dk, ek)
+        generate_impl()
     }
 }
 
@@ -117,16 +179,38 @@ impl DecapsulationKey {
     }
 
     /// Decapsulates a ciphertext to recover the hybrid shared secret.
+    /// Internal: [`crate::seal::unseal`] is the stable entry point.
     ///
     /// # Errors
     ///
     /// Returns [`SealError::WrongLength`] if the ciphertext is malformed, or
     /// [`SealError::InvalidMlKem`] if the ML-KEM component is rejected.
+    #[cfg(not(feature = "hazmat"))]
+    pub(crate) fn decapsulate(&self, ct: &[u8]) -> Result<SharedSecret, SealError> {
+        self.decapsulate_impl(ct)
+    }
+
+    /// Decapsulates a ciphertext to recover the hybrid shared secret.
+    ///
+    /// HAZMAT: reachable only with the `hazmat` feature, for known-answer
+    /// testing only — no stability promise. A normal consumer calls
+    /// [`crate::seal::unseal`] instead, which decapsulates internally.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SealError::WrongLength`] if the ciphertext is malformed, or
+    /// [`SealError::InvalidMlKem`] if the ML-KEM component is rejected.
+    // kanon:ignore RUST/pub-visibility -- hazmat-only primitive surface (sphragis#23): reachable for KAT/conformance testing, feature-gated off the normal public API
+    #[cfg(feature = "hazmat")]
+    pub fn decapsulate(&self, ct: &[u8]) -> Result<SharedSecret, SealError> {
+        self.decapsulate_impl(ct)
+    }
+
     #[expect(
         clippy::similar_names,
         reason = "ss_m/ss_x/ct_x/sk_x/pk_x mirror the X-Wing spec notation; spec-faithful names beat the similar_names heuristic (upstream does the same)"
     )]
-    pub fn decapsulate(&self, ct: &[u8]) -> Result<SharedSecret, SealError> {
+    fn decapsulate_impl(&self, ct: &[u8]) -> Result<SharedSecret, SealError> {
         ensure!(
             ct.len() == CIPHERTEXT_LEN,
             WrongLengthSnafu {
@@ -163,6 +247,7 @@ impl DecapsulationKey {
 
 impl EncapsulationKey {
     /// Encapsulates to this public key, returning `(ciphertext, shared_secret)`.
+    /// Internal: [`crate::seal::seal_for`] is the stable entry point.
     ///
     /// Uses the OS CSPRNG. Ciphertext wire form is `ML-KEM ct || X25519 ct`.
     ///
@@ -171,7 +256,31 @@ impl EncapsulationKey {
     /// Returns [`SealError::WrongLength`] if the ML-KEM message seed cannot be
     /// formed from the sampled randomness (unreachable for a well-formed
     /// 64-byte buffer; propagated rather than silently defaulted).
+    #[cfg(not(feature = "hazmat"))]
+    pub(crate) fn encapsulate(&self) -> Result<(Vec<u8>, SharedSecret), SealError> {
+        self.encapsulate_impl()
+    }
+
+    /// Encapsulates to this public key, returning `(ciphertext, shared_secret)`.
+    ///
+    /// HAZMAT: reachable only with the `hazmat` feature, for known-answer
+    /// testing only — no stability promise. A normal consumer calls
+    /// [`crate::seal::seal_for`] instead, which encapsulates internally.
+    ///
+    /// Uses the OS CSPRNG. Ciphertext wire form is `ML-KEM ct || X25519 ct`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SealError::WrongLength`] if the ML-KEM message seed cannot be
+    /// formed from the sampled randomness (unreachable for a well-formed
+    /// 64-byte buffer; propagated rather than silently defaulted).
+    // kanon:ignore RUST/pub-visibility -- hazmat-only primitive surface (sphragis#23): reachable for KAT/conformance testing, feature-gated off the normal public API
+    #[cfg(feature = "hazmat")]
     pub fn encapsulate(&self) -> Result<(Vec<u8>, SharedSecret), SealError> {
+        self.encapsulate_impl()
+    }
+
+    fn encapsulate_impl(&self) -> Result<(Vec<u8>, SharedSecret), SealError> {
         let mut rnd = Zeroizing::new([0u8; 64]);
         OsRng.fill_bytes(rnd.as_mut_slice());
         self.encapsulate_deterministic(&rnd)

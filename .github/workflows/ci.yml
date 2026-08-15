@@ -57,8 +57,10 @@ jobs:
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
       - name: cargo check (default)
         run: cargo check --all-targets
-      - name: cargo check (preview-pq)
+      - name: cargo check (preview-pq — narrowed public API)
         run: cargo check --all-targets --features preview-pq
+      - name: cargo check (preview-pq + hazmat)
+        run: cargo check --all-targets --features preview-pq,hazmat
 
   clippy:
     name: cargo clippy
@@ -74,8 +76,10 @@ jobs:
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
       - name: clippy (default)
         run: cargo clippy --all-targets -- -D warnings
-      - name: clippy (preview-pq)
+      - name: clippy (preview-pq — narrowed public API)
         run: cargo clippy --all-targets --features preview-pq -- -D warnings
+      - name: clippy (preview-pq + hazmat)
+        run: cargo clippy --all-targets --features preview-pq,hazmat -- -D warnings
 
   test:
     name: cargo test
@@ -89,5 +93,7 @@ jobs:
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
       - name: cargo test (default — inert build check)
         run: cargo test
-      - name: cargo test (preview-pq — KAT + round-trip + negatives)
+      - name: cargo test (preview-pq — narrowed public API, no hazmat)
         run: cargo test --features preview-pq
+      - name: cargo test (preview-pq + hazmat — KAT + round-trip + negatives)
+        run: cargo test --features preview-pq,hazmat
