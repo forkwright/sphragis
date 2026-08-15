@@ -518,12 +518,16 @@ fn encapsulation_key_wire_round_trip() {
 
 /// Wrong-length encapsulation-key and ciphertext inputs are rejected, and
 /// the rejection carries the failing call site's location (sphragis#26).
+// WHY matched on `&short_ek_result` rather than unwrapped/moved:
+// `EncapsulationKey` is intentionally not `Debug` (it holds key-derived
+// material), so `.unwrap_err()` does not compile here — same reasoning as
+// `tests/entropy_failure.rs`'s `generate_with_rng_returns_entropy_error_not_panic`.
 #[test]
 fn wrong_length_ek_and_ct_rejected() {
     let (dk, ek) = fresh();
 
     let ek_bytes = ek.to_bytes();
-    let short_ek_err = EncapsulationKey::from_bytes(&ek_bytes[..ek_bytes.len() - 1]).unwrap_err();
+    let short_ek_result = EncapsulationKey::from_bytes(&ek_bytes[..ek_bytes.len() - 1]);
     assert!(EncapsulationKey::from_bytes(&[]).is_err());
     let mut long = ek.to_bytes();
     long.push(0);
@@ -534,8 +538,8 @@ fn wrong_length_ek_and_ct_rejected() {
     assert!(dk.decapsulate(&[]).is_err());
     assert!(dk.decapsulate(&[0u8; CIPHERTEXT_LEN - 1]).is_err());
 
-    let SealError::WrongLength { location, .. } = short_ek_err else {
-        panic!("expected SealError::WrongLength, got {short_ek_err:?}");
+    let Err(SealError::WrongLength { location, .. }) = &short_ek_result else {
+        panic!("expected SealError::WrongLength");
     };
     assert!(
         location.file.ends_with("hybrid.rs"),
