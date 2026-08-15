@@ -282,15 +282,21 @@ The RNG is caller-injectable at the primitive layer
 (`HybridKem::generate_with_rng` / `EncapsulationKey::encapsulate_with_rng`,
 each `<R: RngCore + CryptoRng>`) — the same trait bound `x25519-dalek`'s own
 `random_from_rng` requires, taken by `&mut R` rather than by value so one
-injected RNG's state carries across every draw in a call. Per §9's
-hazmat boundary, both seams follow `HybridKem::generate`/
-`EncapsulationKey::encapsulate`'s own split: `pub(crate)` without `hazmat`,
-`pub` with it — an injectable RNG is a conformance-testing affordance
-(`tests/entropy_failure.rs`), not something a normal consumer needs, since
-`generate_recipient_keypair` always draws fresh OS randomness. The envelope
-layer gets its own seam instead: `seal_for_with_rng` (not hazmat-gated,
-alongside `seal_for`) draws twice per recipient across N recipients — the
-KEM encapsulation randomness and the AEAD nonce — which is why it takes
+injected RNG's state carries across every draw in a call. Per §9's hazmat
+boundary, both seams follow `HybridKem::generate`'s own split: `pub(crate)`
+without `hazmat`, `pub` with it — an injectable RNG is a
+conformance-testing affordance (`tests/entropy_failure.rs`), not something
+a normal consumer needs, since `generate_recipient_keypair` always draws
+fresh OS randomness. `EncapsulationKey::encapsulate` (the fixed-OsRng
+convenience wrapper around `encapsulate_with_rng`) goes one step further and
+is `hazmat`-only outright, with no `pub(crate)` variant: `seal_for` never
+calls it — `seal_for_with_rng` is itself generic over the RNG and calls
+`encapsulate_with_rng` directly — so a non-`hazmat` build has no internal
+caller for it (`dead_code`, denied under `-D warnings`) and does not
+compile it at all. The envelope layer gets its own seam instead:
+`seal_for_with_rng` (not hazmat-gated, alongside `seal_for`) draws twice per
+recipient across N recipients — the KEM encapsulation randomness and the
+AEAD nonce — which is why it takes
 `&mut R` rather than by-value: a by-value take-and-drop parameter would not
 let one injected RNG's state carry across every draw in a multi-recipient
 batch. This is not a cryptographic choice — the OS RNG cannot be made to

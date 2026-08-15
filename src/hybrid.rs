@@ -323,26 +323,14 @@ impl DecapsulationKey {
 impl EncapsulationKey {
     /// Encapsulates to this public key, returning `(ciphertext, shared_secret)`.
     ///
-    /// Internal: [`crate::seal::seal_for`] is the stable entry point.
-    ///
-    /// Uses the OS CSPRNG. Ciphertext wire form is `ML-KEM ct || X25519 ct`.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`SealError::Entropy`] if the OS entropy source fails, or
-    /// [`SealError::WrongLength`] if the ML-KEM message seed cannot be formed
-    /// from the sampled randomness (unreachable for a well-formed 64-byte
-    /// buffer; propagated rather than silently defaulted).
-    #[cfg(not(feature = "hazmat"))]
-    pub(crate) fn encapsulate(&self) -> Result<(Vec<u8>, SharedSecret), SealError> {
-        self.encapsulate_with_rng(&mut OsRng)
-    }
-
-    /// Encapsulates to this public key, returning `(ciphertext, shared_secret)`.
-    ///
     /// HAZMAT: reachable only with the `hazmat` feature, for known-answer
     /// testing only — no stability promise. A normal consumer calls
-    /// [`crate::seal::seal_for`] instead, which encapsulates internally.
+    /// [`crate::seal::seal_for`] instead: it does not route through this
+    /// fixed-OsRng convenience wrapper, since [`crate::seal::seal_for_with_rng`]
+    /// is itself generic over the RNG and calls
+    /// [`encapsulate_with_rng`](Self::encapsulate_with_rng) directly — so
+    /// without `hazmat` this method would have no caller in the crate at all
+    /// (`dead_code`, denied under `-D warnings`) and is not compiled.
     ///
     /// Uses the OS CSPRNG. Ciphertext wire form is `ML-KEM ct || X25519 ct`.
     ///
