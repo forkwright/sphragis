@@ -229,9 +229,11 @@ impl WrappedContentKey {
     }
 }
 
-/// Generates a fresh recipient keypair: an [`EncapsulationKey`] (public —
-/// publish it so others can seal to this device) and a [`DecapsulationKey`]
-/// (secret — persist it via [`DecapsulationKey::to_seed`]).
+/// Generates a fresh recipient keypair.
+///
+/// Returns an [`EncapsulationKey`] (public — publish it so others can seal
+/// to this device) and a [`DecapsulationKey`] (secret — persist it via
+/// [`DecapsulationKey::to_seed`]).
 ///
 /// This is the versioned Sphragis operation for device-key creation. It is
 /// the only supported way to obtain a keypair for [`seal_for`]/[`unseal`]:

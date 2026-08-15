@@ -67,9 +67,11 @@ pub type SharedSecret = Zeroizing<[u8; SHARED_SECRET_LEN]>; // kanon:ignore RUST
 type MlKemDk = ml_kem::DecapsulationKey<MlKem768>;
 type MlKemEk = ml_kem::EncapsulationKey<MlKem768>;
 
-/// The X-Wing hybrid KEM over X25519 + ML-KEM-768. Internal: a normal
-/// consumer calls [`crate::seal::generate_recipient_keypair`] instead of
-/// naming this type — see sphragis#23 (envelope-vs-primitive API boundary).
+/// The X-Wing hybrid KEM over X25519 + ML-KEM-768.
+///
+/// Internal: a normal consumer calls
+/// [`crate::seal::generate_recipient_keypair`] instead of naming this type —
+/// see sphragis#23 (envelope-vs-primitive API boundary).
 ///
 /// Without `hazmat`, `HybridKem` is not exported from the crate root or
 /// `hybrid` module — a downstream consumer cannot name it:
@@ -129,8 +131,10 @@ fn generate_impl() -> (DecapsulationKey, EncapsulationKey) {
 }
 
 impl HybridKem {
-    /// Generates a fresh X-Wing keypair using the OS CSPRNG. Internal:
-    /// [`crate::seal::generate_recipient_keypair`] is the stable entry point.
+    /// Generates a fresh X-Wing keypair using the OS CSPRNG.
+    ///
+    /// Internal: [`crate::seal::generate_recipient_keypair`] is the stable
+    /// entry point.
     #[cfg(not(feature = "hazmat"))]
     #[must_use]
     pub(crate) fn generate() -> (DecapsulationKey, EncapsulationKey) {
@@ -179,6 +183,7 @@ impl DecapsulationKey {
     }
 
     /// Decapsulates a ciphertext to recover the hybrid shared secret.
+    ///
     /// Internal: [`crate::seal::unseal`] is the stable entry point.
     ///
     /// # Errors
@@ -247,6 +252,7 @@ impl DecapsulationKey {
 
 impl EncapsulationKey {
     /// Encapsulates to this public key, returning `(ciphertext, shared_secret)`.
+    ///
     /// Internal: [`crate::seal::seal_for`] is the stable entry point.
     ///
     /// Uses the OS CSPRNG. Ciphertext wire form is `ML-KEM ct || X25519 ct`.

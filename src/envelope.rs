@@ -48,9 +48,10 @@ fn derive_wrap_key_impl(
     Ok(okm)
 }
 
-/// Derives the 32-byte wrapping key from a hybrid shared secret. Internal:
-/// [`seal_for`](crate::seal::seal_for)/[`unseal`](crate::seal::unseal) are
-/// the stable entry points a normal consumer calls instead.
+/// Derives the 32-byte wrapping key from a hybrid shared secret.
+///
+/// Internal: [`seal_for`](crate::seal::seal_for)/[`unseal`](crate::seal::unseal)
+/// are the stable entry points a normal consumer calls instead.
 ///
 /// # Errors
 ///
