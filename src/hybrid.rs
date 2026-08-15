@@ -403,10 +403,10 @@ impl EncapsulationKey {
         &self,
         rng: &mut R,
     ) -> Result<(Vec<u8>, SharedSecret), SealError> {
-        let mut rnd = Zeroizing::new([0u8; 64]);
-        rng.try_fill_bytes(rnd.as_mut_slice())
+        let mut randomness = Zeroizing::new([0u8; 64]);
+        rng.try_fill_bytes(randomness.as_mut_slice())
             .context(EntropySnafu)?;
-        self.encapsulate_deterministic(&rnd)
+        self.encapsulate_deterministic(&randomness)
     }
 
     /// Deterministic encapsulation from 64 bytes of randomness (first 32 → ML-KEM
