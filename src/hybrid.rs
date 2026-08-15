@@ -100,6 +100,19 @@ pub struct HybridKem;
 ///
 /// Public data: freely serializable and shareable. Wire form is
 /// `ML-KEM-768 ek (1184) || X25519 pk (32)`.
+///
+/// [`encapsulate`](Self::encapsulate) — which always draws fresh OS
+/// randomness — is the only encapsulation entry point reachable from outside
+/// this crate. The deterministic path the known-answer test needs is a
+/// private method, not part of this type's public API:
+///
+/// ```compile_fail
+/// # use sphragis::HybridKem;
+/// let (_dk, ek) = HybridKem::generate();
+/// let randomness = [0u8; 64];
+/// // `encapsulate_deterministic` is private — this does not compile.
+/// let _ = ek.encapsulate_deterministic(&randomness);
+/// ```
 #[derive(Clone)]
 pub struct EncapsulationKey {
     ek_m: MlKemEk,
@@ -293,17 +306,29 @@ impl EncapsulationKey {
     }
 
     /// Deterministic encapsulation from 64 bytes of randomness (first 32 → ML-KEM
-    /// message, last 32 → X25519 ephemeral). For known-answer testing only.
+    /// message, last 32 → X25519 ephemeral).
     ///
-    /// WARNING: never call with non-uniform or reused randomness.
+    /// INVARIANT: private by construction. Deterministic KEM encapsulation
+    /// with caller-supplied randomness is a known-answer-test affordance: on
+    /// reused or non-uniform input it deterministically collapses the
+    /// ephemeral X25519 secret, the ML-KEM coins, the ciphertext, and the
+    /// shared secret — the exact failure [`encapsulate`](Self::encapsulate)
+    /// exists to make impossible. It stays a private inherent method rather
+    /// than gaining a `cfg(test)` gate because [`encapsulate`] itself calls
+    /// straight through to it in every build (with fresh `OsRng` bytes), so
+    /// the method must compile unconditionally; privacy alone already keeps
+    /// it unreachable from any downstream crate. The known-answer test that
+    /// exercises this method directly with the published draft vector lives
+    /// beside it, in this module's own `#[cfg(test)] mod tests` below — a
+    /// `tests/` integration file compiles as a separate crate and cannot
+    /// name a private item.
     ///
     /// # Errors
     ///
     /// Returns [`SealError::WrongLength`] if the ML-KEM message seed cannot be
     /// formed from `randomness` (unreachable for a `[u8; 64]` input; propagated
     /// per the crate's no-silent-fallback discipline).
-    #[doc(hidden)]
-    pub fn encapsulate_deterministic(
+    fn encapsulate_deterministic(
         &self,
         randomness: &[u8; 64],
     ) -> Result<(Vec<u8>, SharedSecret), SealError> {
@@ -422,4 +447,87 @@ fn x_public_from_slice(bytes: &[u8]) -> Result<XPublic, SealError> {
         actual: bytes.len(),
     })?;
     Ok(XPublic::from(arr))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Reads a vendored vector fixture (`tests/vectors/<name>`) as JSON.
+    ///
+    /// `crypto-provenance.toml` records this file's provenance and hash;
+    /// `tests/provenance_lock.rs` checks the hash. Reading it here rather
+    /// than re-typing its fields as a parallel set of hex literals means the
+    /// executed assertion and the hash-locked file can never silently
+    /// desync.
+    #[expect(
+        clippy::unwrap_used,
+        reason = "KAT harness: this repo's own vendored, hash-locked vector fixture; a failed read/parse IS the test failure"
+    )]
+    fn vector_json(name: &str) -> serde_json::Value {
+        let path = format!("{}/tests/vectors/{name}", env!("CARGO_MANIFEST_DIR"));
+        let raw = std::fs::read_to_string(&path).unwrap();
+        serde_json::from_str(&raw).unwrap()
+    }
+
+    #[expect(
+        clippy::unwrap_used,
+        reason = "KAT harness: inputs are fixed known-answer vectors; a failed unwrap IS the test failure"
+    )]
+    fn hex_field(v: &serde_json::Value, field: &str) -> Vec<u8> {
+        hex::decode(v[field].as_str().unwrap()).unwrap()
+    }
+
+    /// X-Wing draft known-answer vector (`crypto-provenance.toml`:
+    /// xwing-kat-0; draft-connolly-cfrg-xwing-kem). `seed` -> keypair;
+    /// `eseed` -> deterministic encapsulation. Only this crate's own test
+    /// build can name `encapsulate_deterministic` — see its doc comment
+    /// above.
+    #[test]
+    #[expect(
+        clippy::unwrap_used,
+        clippy::similar_names,
+        reason = "KAT harness: inputs are fixed known-answer vectors, a failed unwrap IS the test failure; expected_sk/pk/ct/ss mirror the vendored vector's own field names (sk/pk/ct/ss), which mirror the X-Wing spec notation; spec-faithful names beat the similar_names heuristic"
+    )]
+    fn deterministic_encapsulate_reproduces_xwing_draft_kat() {
+        let doc = vector_json("xwing-draft-connolly-test-vectors.json");
+        let v = &doc[0];
+        let seed: [u8; DECAPSULATION_KEY_LEN] = hex_field(v, "seed").try_into().unwrap();
+        let eseed: [u8; 64] = hex_field(v, "eseed").try_into().unwrap();
+        let expected_sk = hex_field(v, "sk");
+        let expected_pk = hex_field(v, "pk");
+        let expected_ct = hex_field(v, "ct");
+        let expected_ss = hex_field(v, "ss");
+
+        let dk = DecapsulationKey::from_seed(seed);
+        assert_eq!(
+            dk.to_seed().as_slice(),
+            expected_sk.as_slice(),
+            "to_seed must export exactly the seed the key was built from"
+        );
+        let ek = dk.encapsulation_key();
+        assert_eq!(
+            ek.to_bytes(),
+            expected_pk,
+            "X-Wing keygen must reproduce the draft KAT encapsulation key"
+        );
+
+        let (ct, ss_send) = ek.encapsulate_deterministic(&eseed).unwrap();
+        assert_eq!(
+            ct, expected_ct,
+            "X-Wing deterministic encaps must reproduce the draft KAT ciphertext"
+        );
+        assert_eq!(
+            ss_send.as_slice(),
+            expected_ss.as_slice(),
+            "X-Wing deterministic encaps must reproduce the draft KAT shared secret"
+        );
+
+        let ss_recv = dk.decapsulate(&ct).unwrap();
+        assert_eq!(
+            ss_recv.as_slice(),
+            expected_ss.as_slice(),
+            "X-Wing decaps must recover the draft KAT shared secret"
+        );
+    }
 }

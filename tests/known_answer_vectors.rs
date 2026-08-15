@@ -5,7 +5,11 @@
 //! ones) a hash `tests/provenance_lock.rs` checks against the file on disk.
 //! Proves the construction matches the published standards:
 //! - X-Wing draft KAT: full hybrid keypair, ciphertext, and shared secret
-//!   (both directions), not shared-secret-only.
+//!   (both directions), not shared-secret-only. Lives beside the
+//!   implementation, in `src/hybrid.rs`'s own `#[cfg(test)] mod tests` — not
+//!   here. It drives deterministic encapsulation, which is a private method
+//!   on `EncapsulationKey`; this file compiles as a separate crate and
+//!   cannot name it (forkwright/sphragis#17).
 //! - FIPS-203 ML-KEM-768 ACVP: keygen (seed -> ek), encapsulation
 //!   (ek, m -> ct, k), and decapsulation (dk, ct -> k) — executed locally,
 //!   not delegated to the `ml-kem` crate's own test suite (a consumer
@@ -54,59 +58,11 @@ fn hex_field(v: &serde_json::Value, field: &str) -> Vec<u8> {
 // ---------------------------------------------------------------------------
 // X-Wing draft known-answer vector (crypto-provenance.toml: xwing-kat-0).
 // draft-connolly-cfrg-xwing-kem. seed -> keypair; eseed -> deterministic
-// encaps. Origin: the spec authors' own spec/test-vectors.json, vendored via
-// RustCrypto/KEMs.
+// encaps. Lives beside the implementation, in `src/hybrid.rs`'s own
+// `#[cfg(test)] mod tests` — deterministic encapsulation is a private method
+// on `EncapsulationKey`; this file compiles as a separate crate and cannot
+// name it (forkwright/sphragis#17).
 // ---------------------------------------------------------------------------
-
-/// X-Wing KAT: deterministic encapsulation reproduces the published
-/// encapsulation key, ciphertext, and shared secret; decapsulation recovers
-/// the same shared secret.
-#[expect(
-    clippy::similar_names,
-    reason = "expected_sk/pk/ct/ss mirror the vendored vector's own field names (sk/pk/ct/ss), which mirror the X-Wing spec notation; spec-faithful names beat the similar_names heuristic (hybrid.rs does the same for ss_m/ss_x/ct_x/pk_x)"
-)]
-#[test]
-fn xwing_draft_kat_vector_0() {
-    let doc = vector_json("xwing-draft-connolly-test-vectors.json");
-    let v = &doc[0];
-    let seed: [u8; 32] = hex_field(v, "seed").try_into().unwrap();
-    let eseed: [u8; 64] = hex_field(v, "eseed").try_into().unwrap();
-    let expected_sk = hex_field(v, "sk");
-    let expected_pk = hex_field(v, "pk");
-    let expected_ct = hex_field(v, "ct");
-    let expected_ss = hex_field(v, "ss");
-
-    let dk = DecapsulationKey::from_seed(seed);
-    assert_eq!(
-        dk.to_seed().as_slice(),
-        expected_sk.as_slice(),
-        "to_seed must export exactly the seed the key was built from"
-    );
-    let ek = dk.encapsulation_key();
-    assert_eq!(
-        ek.to_bytes(),
-        expected_pk,
-        "X-Wing keygen must reproduce the draft KAT encapsulation key"
-    );
-
-    let (ct, ss_send) = ek.encapsulate_deterministic(&eseed).unwrap();
-    assert_eq!(
-        ct, expected_ct,
-        "X-Wing deterministic encaps must reproduce the draft KAT ciphertext"
-    );
-    assert_eq!(
-        ss_send.as_slice(),
-        expected_ss.as_slice(),
-        "X-Wing deterministic encaps must reproduce the draft KAT shared secret"
-    );
-
-    let ss_recv = dk.decapsulate(&ct).unwrap();
-    assert_eq!(
-        ss_recv.as_slice(),
-        expected_ss.as_slice(),
-        "X-Wing decaps must recover the draft KAT shared secret"
-    );
-}
 
 // ---------------------------------------------------------------------------
 // FIPS-203 ML-KEM-768 known-answer vectors (crypto-provenance.toml:
@@ -327,7 +283,6 @@ fn chacha20poly1305_rfc8439_2_8_2() {
     );
 }
 
-// ---------------------------------------------------------------------------
 // RFC 5869 HKDF-SHA256 — Test Case 1.
 // ---------------------------------------------------------------------------
 

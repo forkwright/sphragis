@@ -17,9 +17,9 @@
 trigger = """
 Any of the following requires re-deriving and re-vendoring the affected
 vector(s) against the new source, updating this file's source_sha256 /
-locked_version / revision fields, and confirming the corresponding test in
-tests/known_answer_vectors.rs still asserts full construction output (not
-just a shared secret) — before merge, not after:
+locked_version / revision fields, and confirming the corresponding test
+(location per that vector's `executed_by` field, below) still asserts full
+construction output (not just a shared secret) — before merge, not after:
   1. `cargo update` changes the resolved version of any crate listed under
      [[dependency]] below.
   2. The X-Wing draft (draft-connolly-cfrg-xwing-kem) publishes a revision
@@ -92,12 +92,16 @@ revision = "RFC 8439"
 source_url = "https://www.rfc-editor.org/rfc/rfc8439"
 
 # ---------------------------------------------------------------------------
-# Vectors. Every entry here MUST have a corresponding executed assertion in
-# tests/known_answer_vectors.rs (`executed_by`). Vendored vectors are
-# committed verbatim, byte-for-byte, from the cited upstream commit — never
-# hand-trimmed or re-typed — so `source_sha256` is checkable both against the
-# vendored file on disk (tests/provenance_lock.rs does this) and against a
-# fresh fetch of `origin_url` at any time.
+# Vectors. Every entry here MUST have a corresponding executed assertion,
+# named in that entry's own `executed_by` field — almost all live in
+# tests/known_answer_vectors.rs; xwing-kat-0 lives in src/hybrid.rs's own
+# #[cfg(test)] mod tests instead, because it drives deterministic
+# encapsulation, a private method (forkwright/sphragis#17) that only the
+# crate's own test build can name. Vendored vectors are committed verbatim,
+# byte-for-byte, from the cited upstream commit — never hand-trimmed or
+# re-typed — so `source_sha256` is checkable both against the vendored file
+# on disk (tests/provenance_lock.rs does this) and against a fresh fetch of
+# `origin_url` at any time.
 # ---------------------------------------------------------------------------
 
 [[vector]]
@@ -107,7 +111,7 @@ origin_url = "https://github.com/dconnolly/draft-connolly-cfrg-xwing-kem/blob/ma
 vendored_from = "https://github.com/RustCrypto/KEMs/blob/bd482f292dedc95002eca3aa35e26222f0cb1064/x-wing/tests/test-vectors.json"
 vendored_file = "tests/vectors/xwing-draft-connolly-test-vectors.json"
 source_sha256 = "a8726596f4c7629590f727b1bbeb483f6932292fbf5fd85c9cbb803190014f00"
-executed_by = "tests/known_answer_vectors.rs::xwing_draft_kat_vector_0"
+executed_by = "src/hybrid.rs::tests::deterministic_encapsulate_reproduces_xwing_draft_kat"
 asserts = ["seed -> decapsulation key (sk)", "encapsulation key (pk)", "ciphertext (ct)", "shared secret (ss), send and receive side"]
 
 [[vector]]
