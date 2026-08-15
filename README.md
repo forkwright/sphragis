@@ -29,10 +29,10 @@ sphragis = { git = "https://github.com/forkwright/sphragis", features = ["previe
 ```
 
 ```rust,ignore
-use sphragis::{HybridKem, seal_for, unseal};
+use sphragis::{generate_recipient_keypair, seal_for, unseal};
 
-// Each device holds an X-Wing keypair; publish the encapsulation (public) key.
-let (dk, ek) = HybridKem::generate();
+// Each device holds a keypair; publish the encapsulation (public) key.
+let (dk, ek) = generate_recipient_keypair();
 
 // Seal a content key for a set of devices (one wrap each, same content key).
 let content_key = [0u8; 32];
@@ -43,12 +43,20 @@ let recovered = unseal(&dk, &wrapped[0])?;
 assert_eq!(recovered.as_slice(), &content_key);
 ```
 
+This is the entire public contract: the generic hybrid-KEM primitive
+underneath (`HybridKem`, a raw shared secret, direct encaps/decaps) is not
+exported — see "Features" below and `DECISION.md` for the envelope-vs-primitive
+boundary (sphragis#23).
+
 Revoke a device by re-running `seal_for` over the remaining recipients (with a
 fresh content key for forward secrecy, or the same one for a cheap revoke).
 
 ## Features
 
 - `preview-pq` - enables the hybrid KEM + envelope. **Off by default.**
+- `hazmat` - exposes the generic hybrid-KEM primitive (`HybridKem`, raw shared
+  secret, direct encaps/decaps, `derive_wrap_key`) for known-answer/conformance
+  testing. **No stability promise; a normal consumer never enables this.**
 
 ## Testing
 

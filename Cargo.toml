@@ -24,6 +24,13 @@ preview-pq = [
     "dep:chacha20poly1305",
     "dep:rand_core",
 ]
+# WHY(sphragis#23): reachability, not a dependency set — no crypto deps of its
+# own. Ships the generic X-Wing/ML-KEM primitive surface (HybridKem, raw
+# SharedSecret, direct encaps/decaps, derive_wrap_key) for known-answer-vector
+# and conformance testing only. No stability promise. A normal consumer never
+# enables this: `generate_recipient_keypair`/`seal_for`/`unseal` are the
+# stable envelope-profile entry points and need no hazmat access.
+hazmat = ["preview-pq"]
 
 [dependencies]
 snafu = "0.8"
@@ -80,6 +87,16 @@ proptest = "1"
 # hash-locked file (crypto-provenance.toml, tests/provenance_lock.rs).
 serde_json = "1"
 hex = "0.4"
+
+# WHY(sphragis#23): the KAT gate calls the hazmat-only primitive surface
+# directly (HybridKem, derive_wrap_key, direct encaps/decaps) to prove the
+# construction against published vectors — declaring that requirement here
+# means `cargo test --features preview-pq` (no hazmat) skips this target
+# instead of failing to compile it, and `--features preview-pq,hazmat` runs
+# it.
+[[test]]
+name = "known_answer_vectors"
+required-features = ["preview-pq", "hazmat"]
 
 [lints.rust]
 unsafe_code = "forbid"

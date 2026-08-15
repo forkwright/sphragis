@@ -8,6 +8,11 @@
 //! Sha256 cores and block buffers on drop (mirroring the sha3 0.11 property in
 //! `hybrid`), so the shared-secret-derived state inside the HKDF stack does not
 //! outlive the derivation.
+//!
+//! INVARIANT: this module is the primitive side of the envelope seam
+//! (sphragis#23) — `derive_wrap_key` is reachable only under `hazmat`.
+//! [`crate::seal::seal_for`]/[`crate::seal::unseal`] call the crate-private
+//! path unconditionally; a normal consumer never derives a wrap key directly.
 
 use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 use chacha20poly1305::{ChaCha20Poly1305, Key, Nonce};
@@ -18,24 +23,16 @@ use zeroize::{Zeroize, Zeroizing};
 use crate::error::SealError;
 
 /// AEAD nonce length (ChaCha20-Poly1305).
-pub const NONCE_LEN: usize = 12; // kanon:ignore RUST/pub-visibility -- public wire-shape constant (typed into WrappedContentKey)
+pub(crate) const NONCE_LEN: usize = 12;
 /// AEAD authentication-tag length (Poly1305).
-pub const TAG_LEN: usize = 16; // kanon:ignore RUST/pub-visibility -- public wire-shape constant (sealed_key length validation)
+pub(crate) const TAG_LEN: usize = 16;
 /// Wrapping-key length derived from HKDF.
-pub const WRAP_KEY_LEN: usize = 32; // kanon:ignore RUST/pub-visibility -- public constant in derive_wrap_key's signature
+pub(crate) const WRAP_KEY_LEN: usize = 32;
 
-/// Derives the 32-byte wrapping key from a hybrid shared secret.
-///
 /// `HKDF-SHA256(salt = 32 zero bytes, ikm = shared_secret, info = domain)`.
 /// A null (zero-filled) salt is used per the PQXDH/SP 800-56C convention for a
 /// uniformly-random IKM.
-///
-/// # Errors
-///
-/// Returns [`SealError::HkdfExpand`] if expansion fails (cannot occur for a
-/// 32-byte output, but surfaced rather than panicking).
-// kanon:ignore RUST/pub-visibility -- public API: the RFC 5869 KAT gate consumes it externally
-pub fn derive_wrap_key(
+fn derive_wrap_key_impl(
     shared_secret: &[u8],
     domain: &[u8],
 ) -> Result<Zeroizing<[u8; WRAP_KEY_LEN]>, SealError> {
@@ -49,6 +46,44 @@ pub fn derive_wrap_key(
     hk.expand(domain, okm.as_mut_slice())
         .map_err(|_| SealError::HkdfExpand)?;
     Ok(okm)
+}
+
+/// Derives the 32-byte wrapping key from a hybrid shared secret.
+///
+/// Internal: [`seal_for`](crate::seal::seal_for)/[`unseal`](crate::seal::unseal)
+/// are the stable entry points a normal consumer calls instead.
+///
+/// # Errors
+///
+/// Returns [`SealError::HkdfExpand`] if expansion fails (cannot occur for a
+/// 32-byte output, but surfaced rather than panicking).
+#[cfg(not(feature = "hazmat"))]
+pub(crate) fn derive_wrap_key(
+    shared_secret: &[u8],
+    domain: &[u8],
+) -> Result<Zeroizing<[u8; WRAP_KEY_LEN]>, SealError> {
+    derive_wrap_key_impl(shared_secret, domain)
+}
+
+/// Derives the 32-byte wrapping key from a hybrid shared secret.
+///
+/// HAZMAT: primitive-level HKDF access, reachable only with the `hazmat`
+/// feature, for RFC 5869 known-answer testing only — no stability promise.
+/// A normal consumer calls
+/// [`seal_for`](crate::seal::seal_for)/[`unseal`](crate::seal::unseal)
+/// instead, which derive the wrap key internally.
+///
+/// # Errors
+///
+/// Returns [`SealError::HkdfExpand`] if expansion fails (cannot occur for a
+/// 32-byte output, but surfaced rather than panicking).
+// kanon:ignore RUST/pub-visibility -- hazmat-only primitive surface (sphragis#23): the RFC 5869 KAT gate consumes it externally, feature-gated off the normal public API
+#[cfg(feature = "hazmat")]
+pub fn derive_wrap_key(
+    shared_secret: &[u8],
+    domain: &[u8],
+) -> Result<Zeroizing<[u8; WRAP_KEY_LEN]>, SealError> {
+    derive_wrap_key_impl(shared_secret, domain)
 }
 
 /// Seals `content_key` under `wrap_key`, binding `aad`. Returns

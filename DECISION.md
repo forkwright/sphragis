@@ -212,3 +212,51 @@ Per #131 done-criterion 6, this lands explicitly **unaudited / Preview**:
   cryptographic review.
 - The KATs prove the construction matches the published standard; they do **not**
   substitute for an audit of the implementation.
+
+## 9. Public API boundary: envelope profile, not a primitive library (sphragis#23)
+
+Sphragis earns authority as a versioned, multi-recipient content-key
+envelope — wire versioning, recipient identity, domain/AAD binding,
+sealing/unsealing, key-epoch semantics. It does not earn authority over the
+generic X-Wing/KEM primitive underneath it: that primitive is unaudited (§8),
+pinned to this repo's own transcription of the draft (§6), and named in §6 as
+something to be *replaced*, not depended on directly.
+
+**What's public.** `generate_recipient_keypair`, `seal_for`, `unseal`,
+`RecipientId`, `WrappedContentKey`, `EncapsulationKey`, `DecapsulationKey`.
+The last two stay public because they are the profile's recipient-identity
+types — `seal_for`/`unseal` take and return them — not because they are
+primitives; their key-management operations (`to_bytes`/`from_bytes`,
+`from_seed`/`to_seed`, `encapsulation_key`) are profile-level (publish a
+device's key, persist a device's secret) and stay reachable. Their *KEM*
+operations (raw `encapsulate`/`decapsulate`) do not.
+
+**What moved behind `hazmat`.** `HybridKem`, the raw `SharedSecret` type,
+direct `EncapsulationKey::encapsulate`/`DecapsulationKey::decapsulate`, and
+`derive_wrap_key` — the generic hybrid-KEM primitive and its raw output. A
+normal consumer has no way to assemble a bespoke construction from these
+because it cannot name them; it can only call the versioned envelope
+operations. `hazmat` carries no stability promise and exists solely so
+`tests/known_answer_vectors.rs` can validate the primitive against published
+vectors (X-Wing draft, RFC 5869) — the same justification RustCrypto and
+rustls use the word "hazmat" for.
+
+**The adapter seam.** `src/hybrid.rs` is now the *only* module that performs
+a raw KEM operation; `src/seal.rs` calls it exclusively through
+`EncapsulationKey`/`DecapsulationKey`'s key-management surface plus the
+crate-private `generate`/`encapsulate`/`decapsulate`/`derive_wrap_key` paths.
+Swapping the local X-Wing combiner (§6) for a stable, audited upstream
+implementation is therefore a change to `src/hybrid.rs` alone: the
+`EncapsulationKey`/`DecapsulationKey` wire forms (`ENCAPSULATION_KEY_LEN`,
+`CIPHERTEXT_LEN`, `DECAPSULATION_KEY_LEN`), `seal.rs`'s call shapes, and the
+`seal_for`/`unseal`/`generate_recipient_keypair` public API do not move.
+
+**What this decision does not do.** It does not perform the migration §6
+already names as the target — upstream `x-wing` is still a release-candidate
+stack (§6), and building the seam does not make a pre-release dependency
+production-grade. The gate for the actual swap is unchanged from §6: a
+stable, audited upstream X-Wing release, whose keypair/ciphertext/shared-secret
+KATs are byte-identical to the vectors this repo already pins (a `v1`-wire
+adapter, not a `v2` construction) — otherwise it is a new version, not a
+drop-in. Until that gate is met, `src/hybrid.rs`'s transcription remains the
+implementation and `hazmat` remains the only way to reach it directly.

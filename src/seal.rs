@@ -13,7 +13,7 @@ use crate::envelope::{derive_wrap_key, open, seal, NONCE_LEN, TAG_LEN};
 use crate::error::{
     EnvelopeTooLargeSnafu, SealError, TrailingDataSnafu, UnsupportedVersionSnafu, WrongLengthSnafu,
 };
-use crate::hybrid::{DecapsulationKey, EncapsulationKey, CIPHERTEXT_LEN};
+use crate::hybrid::{DecapsulationKey, EncapsulationKey, HybridKem, CIPHERTEXT_LEN};
 use crate::{SEAL_VERSION_V1, WRAP_DOMAIN_V1};
 
 /// Content-key length (the symmetric key the consuming store uses for payloads).
@@ -227,6 +227,24 @@ impl WrappedContentKey {
         *recipient_bytes = self.recipient_id.0;
         aad
     }
+}
+
+/// Generates a fresh recipient keypair.
+///
+/// Returns an [`EncapsulationKey`] (public — publish it so others can seal
+/// to this device) and a [`DecapsulationKey`] (secret — persist it via
+/// [`DecapsulationKey::to_seed`]).
+///
+/// This is the versioned Sphragis operation for device-key creation. It is
+/// the only supported way to obtain a keypair for [`seal_for`]/[`unseal`]:
+/// the underlying hybrid-KEM primitive (`HybridKem`) is not part of the
+/// normal public API (sphragis#23) — see `DECISION.md` for the
+/// envelope-vs-primitive boundary and the upstream-adapter seam this exists
+/// to keep stable across a future primitive-provider swap.
+// kanon:ignore RUST/pub-visibility -- re-exported in lib.rs
+#[must_use]
+pub fn generate_recipient_keypair() -> (DecapsulationKey, EncapsulationKey) {
+    HybridKem::generate()
 }
 
 /// Seals a content key for each recipient device.

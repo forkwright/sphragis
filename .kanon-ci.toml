@@ -12,15 +12,19 @@ cmd = "cargo fmt --all -- --check"
 timeout_secs = 300
 
 [stages."cargo check"]
-cmd = "cargo check --all-targets --features preview-pq --jobs 8"
+# WHY(sphragis#23): hazmat included so this single local stage also compiles
+# the KAT gate (tests/known_answer_vectors.rs), which required-features off
+# without it; CI's matrix additionally checks preview-pq alone (narrowed
+# public API, no hazmat) as its own job.
+cmd = "cargo check --all-targets --features preview-pq,hazmat --jobs 8"
 timeout_secs = 600
 
 [stages."cargo clippy"]
-cmd = "cargo clippy --all-targets --features preview-pq --jobs 8 -- -D warnings"
+cmd = "cargo clippy --all-targets --features preview-pq,hazmat --jobs 8 -- -D warnings"
 timeout_secs = 600
 
 [stages."cargo test"]
-cmd = "cargo test --features preview-pq --jobs 8 -- --test-threads 8"
+cmd = "cargo test --features preview-pq,hazmat --jobs 8 -- --test-threads 8"
 timeout_secs = 600
 
 [stages."kanon lint"]
