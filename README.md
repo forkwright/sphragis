@@ -48,8 +48,32 @@ underneath (`HybridKem`, a raw shared secret, direct encaps/decaps) is not
 exported — see "Features" below and `DECISION.md` for the envelope-vs-primitive
 boundary (sphragis#23).
 
-Revoke a device by re-running `seal_for` over the remaining recipients (with a
-fresh content key for forward secrecy, or the same one for a cheap revoke).
+`seal_for` **distributes** a content key to a recipient set; it has no memory
+of who has ever recovered one, so re-running it over a smaller list is not
+revocation — a recipient who already unsealed the key keeps it regardless of
+whether a later call addresses them again. Actually revoking a device is a
+typed protocol in the `rotate` module: generate a new content key, publish
+wraps of it for the retained recipients only, commit the new epoch, then
+retire the old key.
+
+```rust,ignore
+use sphragis::{generate_content_key, EpochId, PendingRotation};
+
+let new_content_key = generate_content_key()?;
+let pending = PendingRotation::begin(EpochId(1), &new_content_key, &old_content_key)?;
+let published = pending.publish_wraps_for(&retained_recipients)?; // device 2 excluded
+// Persist `published.wraps()` as epoch 1's live wrap set, then:
+let committed = published.commit();
+committed.retire_old_key(old_content_key);
+```
+
+**What rotation does not protect.** Ciphertext already written under the old
+content key stays readable by anyone who holds that key — including a
+recipient this rotation just excluded, if they ever unsealed it before now.
+Rotation protects data written *after* the switch, not data written before
+it; re-encrypting old data under the new key, if wanted, is the consumer's
+own operation against their own store. See `src/rotate.rs`'s module doc and
+`tests/rotation.rs` for the adversarial proof.
 
 ## Features
 

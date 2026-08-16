@@ -24,13 +24,15 @@
 //! The stable contract is the versioned envelope:
 //! [`generate_recipient_keypair`](seal::generate_recipient_keypair),
 //! [`seal_for`], [`seal_for_with_rng`], [`unseal`], [`RecipientId`],
-//! [`WrappedContentKey`]. The generic hybrid-KEM primitive underneath it
-//! (`HybridKem`, a raw `SharedSecret`, direct encaps/decaps,
-//! `derive_wrap_key`) is reachable only with the `hazmat` feature, for
-//! known-answer/conformance testing — no stability promise, and no
-//! migration promise: `DECISION.md` records why the local X-Wing combiner
-//! exists (upstream is pre-release) and what gates swapping it for a
-//! stable, audited upstream implementation. That swap changes
+//! [`WrappedContentKey`], plus the [`rotate`] module's typed key-rotation
+//! protocol (sphragis#14) — actual device revocation, as distinct from
+//! `seal_for`'s recipient-key distribution. The generic hybrid-KEM
+//! primitive underneath it (`HybridKem`, a raw `SharedSecret`, direct
+//! encaps/decaps, `derive_wrap_key`) is reachable only with the `hazmat`
+//! feature, for known-answer/conformance testing — no stability promise,
+//! and no migration promise: `DECISION.md` records why the local X-Wing
+//! combiner exists (upstream is pre-release) and what gates swapping it for
+//! a stable, audited upstream implementation. That swap changes
 //! `src/hybrid.rs` alone; this profile's API and wire contract do not move.
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
@@ -43,6 +45,8 @@ pub mod error;
 #[cfg(feature = "preview-pq")]
 pub mod hybrid;
 #[cfg(feature = "preview-pq")]
+pub mod rotate;
+#[cfg(feature = "preview-pq")]
 pub mod seal;
 
 #[cfg(feature = "preview-pq")]
@@ -51,6 +55,11 @@ pub use error::SealError;
 pub use hybrid::{DecapsulationKey, EncapsulationKey};
 #[cfg(all(feature = "preview-pq", feature = "hazmat"))]
 pub use hybrid::{HybridKem, SharedSecret};
+#[cfg(feature = "preview-pq")]
+pub use rotate::{
+    generate_content_key, generate_content_key_with_rng, CommittedEpoch, EpochId, PendingRotation,
+    PublishedWraps, RotationComplete,
+};
 #[cfg(feature = "preview-pq")]
 pub use seal::{
     generate_recipient_keypair, seal_for, seal_for_with_rng, unseal, RecipientId,

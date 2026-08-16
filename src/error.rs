@@ -114,4 +114,18 @@ pub enum SealError {
         #[snafu(implicit)]
         location: snafu::Location,
     },
+
+    /// A rotation's new content key was equal to the old epoch's content
+    /// key. Rotation exists to change what secret a removed recipient
+    /// needs; reusing the old key would produce a full set of new wraps
+    /// that a revoked recipient can already decrypt, defeating rotation
+    /// while looking, from the wrap set alone, like it succeeded.
+    #[snafu(display(
+        "rotation content key equals the previous epoch's key: this would not change what a revoked recipient can decrypt"
+    ))]
+    ContentKeyUnchanged {
+        /// Source location of the failing check.
+        #[snafu(implicit)]
+        location: snafu::Location,
+    },
 }

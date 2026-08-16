@@ -386,20 +386,24 @@ fn multi_recipient_all_recover_same_key() {
     assert_eq!(unseal(&dk3, &wrapped[2]).unwrap().as_slice(), &content_key);
 }
 
-/// Revocation: re-sealing for the remaining recipients excludes the revoked one.
+/// Recipient omission: re-sealing for a smaller set excludes the omitted
+/// device from the new wrap set. This is NOT revocation (sphragis#14) — it
+/// proves only that device 2 has no wrap addressed to it here, not that
+/// device 2 has lost the ability to decrypt anything. A device that never
+/// held a content key in the first place was never going to keep it
+/// either, so this test does not model a revoked device at all; see
+/// `tests/rotation.rs::rotation_actually_revokes_a_device_that_held_the_old_key`
+/// for the adversarial property a real revocation must satisfy.
 #[test]
-fn revocation_excludes_device() {
+fn seal_for_omits_unlisted_recipient() {
     let (dk1, ek1) = fresh();
     let (dk2, ek2) = fresh();
     let content_key = [0x22u8; CONTENT_KEY_LEN];
 
-    // Revoke device 2: re-seal for device 1 only.
-    let rewrapped = seal_for(&content_key, &[ek1]).unwrap();
-    assert_eq!(rewrapped.len(), 1);
-    assert_eq!(
-        unseal(&dk1, &rewrapped[0]).unwrap().as_slice(),
-        &content_key
-    );
+    // Seal for device 1 only; device 2 is simply not in the recipient list.
+    let wrapped = seal_for(&content_key, &[ek1]).unwrap();
+    assert_eq!(wrapped.len(), 1);
+    assert_eq!(unseal(&dk1, &wrapped[0]).unwrap().as_slice(), &content_key);
 
     // Device 2 has no wrap addressed to it.
     let _ = (dk2, ek2);
@@ -605,14 +609,17 @@ fn seal_for_draws_fresh_randomness() {
     assert_ne!(a.sealed_key, b.sealed_key, "sealed keys must never repeat");
 }
 
-/// The empty recipient list (full revocation) seals to an empty set.
+/// The empty recipient list seals to an empty set — a structural property
+/// of `seal_for`, not "full revocation": an empty wrap set says nothing
+/// about whether a previously-provisioned recipient still holds a content
+/// key from before this call (sphragis#14).
 #[test]
 fn seal_for_empty_recipients_is_empty() {
     let content_key = [0xAAu8; CONTENT_KEY_LEN];
     let wrapped = seal_for(&content_key, &[]).unwrap();
     assert!(
         wrapped.is_empty(),
-        "revoking every recipient must produce zero wraps, not an error"
+        "an empty recipient list must produce zero wraps, not an error"
     );
 }
 

@@ -23,6 +23,7 @@ preview-pq = [
     "dep:hkdf",
     "dep:chacha20poly1305",
     "dep:rand_core",
+    "dep:subtle",
 ]
 # WHY(sphragis#23): reachability, not a dependency set — no crypto deps of its
 # own. Ships the generic X-Wing/ML-KEM primitive surface (HybridKem, raw
@@ -61,6 +62,15 @@ chacha20poly1305 = { version = "0.10", optional = true }
 # — without it, `Error` is the no_std variant (a bare error code, no source
 # chain) and `.context(EntropySnafu)` does not compile.
 rand_core = { version = "0.6", features = ["getrandom", "std"], optional = true }
+# WHY: `rotate::PendingRotation::begin` is this crate's first *direct*
+# secret-vs-secret comparison (the new epoch's content key against the one
+# it replaces) -- every prior comparison either operates on public data
+# (RecipientId) or lives inside chacha20poly1305's own Poly1305 tag check,
+# which already depends on `subtle` transitively (see DECISION.md #6). A
+# variable-time `==` on two content keys would leak where they agree
+# through timing, so the comparison needs `subtle::ConstantTimeEq`
+# explicitly rather than relying on the transitive copy.
+subtle = { version = "2", optional = true }
 
 # Post-quantum hybrid KEM stack (preview-pq only).
 # WHY: released RustCrypto primitives, not the rc-pinned `x-wing` aggregate crate.
