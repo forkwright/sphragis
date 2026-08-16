@@ -43,5 +43,6 @@ cargo fmt --all -- --check
 
 ## Git
 
-Conventional commits: `<type>(<scope>): <description>`. Scope is `sphragis`.
-Branch from `main`. Squash merge.
+Conventional commits: `<type>(<scope>): <description>`, with `sphragis` as
+the scope on every commit touching this crate. Branch from `main`. Squash
+merge.
