@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/forkwright/sphragis/compare/v0.2.1...v0.2.2) (2026-08-16)
+
+
+### Bug Fixes
+
+* **sphragis:** clear pre-existing kanon-lint debt blocking the dispatch gate ([#39](https://github.com/forkwright/sphragis/issues/39)) ([cf0d8e7](https://github.com/forkwright/sphragis/commit/cf0d8e7f1aa7f3c7ca2eacc0c5b6596e9d926c61))
+
 ## [0.2.1](https://github.com/forkwright/sphragis/compare/v0.2.0...v0.2.1) (2026-08-16)
 
 
