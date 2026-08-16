@@ -136,7 +136,10 @@ fn vendored_vector_files_match_recorded_hash() {
         );
         checked += 1;
     }
-    assert!(checked >= 3, "expected at least the three vendored vectors (x-wing, ML-KEM keygen, ML-KEM encapdecap) to be present and checked, got {checked}");
+    assert!(
+        checked >= 3,
+        "expected at least the three vendored vectors (x-wing, ML-KEM keygen, ML-KEM encapdecap) to be present and checked, got {checked}"
+    );
 }
 
 /// Every `[[vector]].standard` must reference a declared `[[standard]].id`,

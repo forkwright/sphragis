@@ -34,10 +34,10 @@ use hex_literal::hex;
 
 use sphragis::envelope::derive_wrap_key;
 use sphragis::hybrid::{
-    DecapsulationKey, EncapsulationKey, HybridKem, CIPHERTEXT_LEN, ENCAPSULATION_KEY_LEN,
+    CIPHERTEXT_LEN, DecapsulationKey, ENCAPSULATION_KEY_LEN, EncapsulationKey, HybridKem,
 };
-use sphragis::seal::{seal_for, unseal, RecipientId, WrappedContentKey, CONTENT_KEY_LEN};
-use sphragis::{SealError, SEAL_VERSION_V1};
+use sphragis::seal::{CONTENT_KEY_LEN, RecipientId, WrappedContentKey, seal_for, unseal};
+use sphragis::{SEAL_VERSION_V1, SealError};
 
 /// Reads a vendored vector fixture (`tests/vectors/<name>`) as JSON.
 ///

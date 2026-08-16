@@ -9,15 +9,15 @@
 
 use rand_core::{CryptoRng, OsRng, RngCore};
 use serde::{Deserialize, Serialize};
-use snafu::{ensure, ResultExt};
+use snafu::{ResultExt, ensure};
 use zeroize::Zeroizing;
 
-use crate::envelope::{derive_wrap_key, open, seal, NONCE_LEN, TAG_LEN};
+use crate::envelope::{NONCE_LEN, TAG_LEN, derive_wrap_key, open, seal};
 use crate::error::{
     EntropySnafu, EnvelopeTooLargeSnafu, SealError, SerializationSnafu, TrailingDataSnafu,
     UnsupportedVersionSnafu, WrongLengthSnafu,
 };
-use crate::hybrid::{DecapsulationKey, EncapsulationKey, HybridKem, CIPHERTEXT_LEN};
+use crate::hybrid::{CIPHERTEXT_LEN, DecapsulationKey, EncapsulationKey, HybridKem};
 use crate::{SEAL_VERSION_V1, WRAP_DOMAIN_V1};
 
 /// Content-key length (the symmetric key the consuming store uses for payloads).
@@ -348,8 +348,8 @@ pub fn unseal(
 )]
 mod tests {
     use super::{
-        RecipientId, WrappedContentKey, CIPHERTEXT_LEN, CONTENT_KEY_LEN, MAX_ENVELOPE_SIZE,
-        NONCE_LEN, TAG_LEN,
+        CIPHERTEXT_LEN, CONTENT_KEY_LEN, MAX_ENVELOPE_SIZE, NONCE_LEN, RecipientId, TAG_LEN,
+        WrappedContentKey,
     };
 
     /// [`MAX_ENVELOPE_SIZE`] is derived (RFC 8949 §3 header-size arithmetic),

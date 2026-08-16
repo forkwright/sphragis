@@ -53,13 +53,13 @@
 //! under a completed new epoch.
 
 use rand_core::{CryptoRng, OsRng, RngCore};
-use snafu::{ensure, ResultExt};
+use snafu::{ResultExt, ensure};
 use subtle::ConstantTimeEq;
 use zeroize::Zeroizing;
 
 use crate::error::{ContentKeyUnchangedSnafu, EntropySnafu, SealError};
 use crate::hybrid::EncapsulationKey;
-use crate::seal::{seal_for_with_rng, WrappedContentKey, CONTENT_KEY_LEN};
+use crate::seal::{CONTENT_KEY_LEN, WrappedContentKey, seal_for_with_rng};
 
 /// An opaque identifier for a content-key epoch.
 ///
