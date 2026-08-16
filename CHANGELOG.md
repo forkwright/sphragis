@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.2.0](https://github.com/forkwright/sphragis/compare/v0.1.2...v0.2.0) (2026-08-16)
+
+
+### ⚠ BREAKING CHANGES
+
+* **sphragis:** make deterministic encapsulation private ([#31](https://github.com/forkwright/sphragis/issues/31))
+
+### Features
+
+* **sphragis:** define revocation as key rotation, not re-wrapping ([#34](https://github.com/forkwright/sphragis/issues/34)) ([37ba8e3](https://github.com/forkwright/sphragis/commit/37ba8e3a678ecb176b5474f36ec71131a1b73c59))
+* **sphragis:** narrow the public API to the envelope profile, define the adapter seam ([#32](https://github.com/forkwright/sphragis/issues/32)) ([d0a0bb8](https://github.com/forkwright/sphragis/commit/d0a0bb87f28433c4c28c0a809e7b3e49f109c192))
+
+
+### Bug Fixes
+
+* **sphragis:** bind the KAT gate to a machine-readable crypto provenance lock ([#27](https://github.com/forkwright/sphragis/issues/27)) ([65e3433](https://github.com/forkwright/sphragis/commit/65e3433ca529d4a9403f8643ea3e8ae2f165f578))
+* **sphragis:** bound and fully consume untrusted CBOR before accepting a wrapped key ([#24](https://github.com/forkwright/sphragis/issues/24)) ([d165e5b](https://github.com/forkwright/sphragis/commit/d165e5b5f5a5a7f6c952b0e06983d8f8e0dc6a97))
+* **sphragis:** make deterministic encapsulation private ([#31](https://github.com/forkwright/sphragis/issues/31)) ([cf48668](https://github.com/forkwright/sphragis/commit/cf486684d6fd13ebc6e81f12477a9c08a2698779))
+* **sphragis:** redact SharedSecret's Debug and retrofit SealError location ([#33](https://github.com/forkwright/sphragis/issues/33)) ([11216eb](https://github.com/forkwright/sphragis/commit/11216ebddae8b28d758a9e91aa8cbd86f41e7be6))
+* **sphragis:** return typed entropy failures instead of panicking ([#28](https://github.com/forkwright/sphragis/issues/28)) ([2ff3a08](https://github.com/forkwright/sphragis/commit/2ff3a081164428ff33276a236b19dd9037e03359))
+
 ## [Unreleased]
 
 ### Changed
