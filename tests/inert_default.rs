@@ -15,7 +15,7 @@
 
 use std::fs;
 
-const CRYPTO_DEPS: [&str; 7] = [
+const CRYPTO_DEPS: [&str; 8] = [
     "ml-kem",
     "x25519-dalek",
     "sha3",
@@ -23,6 +23,7 @@ const CRYPTO_DEPS: [&str; 7] = [
     "hkdf",
     "chacha20poly1305",
     "rand_core",
+    "subtle",
 ];
 
 fn manifest() -> toml::Value {
