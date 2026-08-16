@@ -9,7 +9,7 @@
 
 #![cfg(feature = "preview-pq")]
 
-use sphragis::{generate_recipient_keypair, seal_for, unseal, CONTENT_KEY_LEN};
+use sphragis::{CONTENT_KEY_LEN, generate_recipient_keypair, seal_for, unseal};
 
 /// A normal consumer generates a keypair, seals a content key for it, and
 /// unseals it back — using only the versioned envelope operations.

@@ -19,14 +19,14 @@
 
 use ml_kem::array::Array;
 use ml_kem::kem::{Decapsulate, Key, KeyExport};
-use ml_kem::{Ciphertext as MlKemCiphertext, MlKem768, Seed, B32};
+use ml_kem::{B32, Ciphertext as MlKemCiphertext, MlKem768, Seed};
 use sha3::digest::{ExtendableOutput, Update, XofReader};
 use sha3::{Digest, Sha3_256, Shake256};
 use x25519_dalek::{PublicKey as XPublic, StaticSecret as XSecret};
 use zeroize::{Zeroize, Zeroizing};
 
 use rand_core::{CryptoRng, OsRng, RngCore};
-use snafu::{ensure, ResultExt};
+use snafu::{ResultExt, ensure};
 
 use crate::error::{EntropySnafu, InvalidMlKemSnafu, SealError, WrongLengthSnafu};
 

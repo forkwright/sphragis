@@ -57,13 +57,13 @@ pub use hybrid::{DecapsulationKey, EncapsulationKey};
 pub use hybrid::{HybridKem, SharedSecret};
 #[cfg(feature = "preview-pq")]
 pub use rotate::{
-    generate_content_key, generate_content_key_with_rng, CommittedEpoch, EpochId, PendingRotation,
-    PublishedWraps, RotationComplete,
+    CommittedEpoch, EpochId, PendingRotation, PublishedWraps, RotationComplete,
+    generate_content_key, generate_content_key_with_rng,
 };
 #[cfg(feature = "preview-pq")]
 pub use seal::{
-    generate_recipient_keypair, seal_for, seal_for_with_rng, unseal, RecipientId,
-    WrappedContentKey, CONTENT_KEY_LEN,
+    CONTENT_KEY_LEN, RecipientId, WrappedContentKey, generate_recipient_keypair, seal_for,
+    seal_for_with_rng, unseal,
 };
 
 /// Wire-format version for the v1 sealing construction.

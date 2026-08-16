@@ -18,8 +18,8 @@ use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 use chacha20poly1305::{ChaCha20Poly1305, Key, Nonce};
 
 use sphragis::{
-    generate_content_key, generate_recipient_keypair, seal_for, unseal, EpochId, PendingRotation,
-    CONTENT_KEY_LEN,
+    CONTENT_KEY_LEN, EpochId, PendingRotation, generate_content_key, generate_recipient_keypair,
+    seal_for, unseal,
 };
 
 /// Stands in for whatever AEAD a consuming store uses to protect its own

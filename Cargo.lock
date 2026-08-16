@@ -852,6 +852,7 @@ dependencies = [
  "sha2",
  "sha3",
  "snafu",
+ "subtle",
  "toml",
  "x25519-dalek",
  "zeroize",

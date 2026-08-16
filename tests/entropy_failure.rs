@@ -28,9 +28,9 @@
 
 use rand_core::{CryptoRng, Error as RngError, RngCore};
 
+use sphragis::SealError;
 use sphragis::hybrid::HybridKem;
 use sphragis::seal::seal_for_with_rng;
-use sphragis::SealError;
 
 /// A CSPRNG stand-in that succeeds a fixed number of `try_fill_bytes` calls
 /// before failing every call after. Fill bytes are deterministic (an

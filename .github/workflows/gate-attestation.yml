@@ -40,10 +40,15 @@
 # set) to keep the doctest coverage `cargo test --features preview-pq`
 # implicitly had — this is a net-new explicit stage, not a 1:1 mirror.
 #
-# UNVERIFIED: no rust-toolchain.toml/file exists in this repo (confirmed) —
-# rust_toolchain is set explicitly below rather than left "" (auto-detect),
-# per the input's own contract. Value picked to match ci.yml's
-# dtolnay/rust-toolchain@<sha> pin on the action's "stable" branch.
+# rust_toolchain is left unset (empty-string default) so hybrid-gate.yml's
+# actions-rust-lang/setup-rust-toolchain step auto-detects from this repo's
+# own rust-toolchain.toml, per the fleet convention the input's own
+# description names (forkwright/harmonia CLAUDE.md: "Toolchain comes from
+# rust-toolchain.toml, never workflow inputs"). An explicit "stable" here
+# previously overrode that pin — the setup action only auto-detects when the
+# `toolchain:` input is the empty string, so any non-empty value bypasses the
+# repo's pinned channel entirely, which is the one thing this input exists to
+# prevent for a repo that already carries its own toolchain file.
 #
 # DOUBLE-BUILD-COST FLAG: ci.yml (fmt/check/clippy/test, on: pull_request +
 # push:main) is NOT currently in branch-protection required_status_checks
@@ -83,7 +88,6 @@ jobs:
   gate:
     uses: forkwright/.github/.github/workflows/hybrid-gate.yml@main
     with:
-      rust_toolchain: "stable"
       fmt_cmd: "cargo fmt --all -- --check"
       check_cmd: "cargo check --all-targets && cargo check --all-targets --features preview-pq"
       clippy_cmd: "cargo clippy --all-targets -- -D warnings && cargo clippy --all-targets --features preview-pq -- -D warnings"
