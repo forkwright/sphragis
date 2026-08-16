@@ -91,6 +91,11 @@ impl SharedSecret {
     /// otherwise persisted outside the derivation it feeds — that is
     /// exactly the leak this type's redacting `Debug` exists to prevent one
     /// layer up.
+    // kanon:ignore PERFORMANCE/missing-complexity-docs -- false positive (forkwright/kanon#3088):
+    // the rule's self-recursion detector is a bare substring match on `"as_slice("`, so
+    // `self.0.as_slice()` (calling the WRAPPED `Zeroizing<[u8; N]>`'s own method, a different
+    // receiver) reads as this function recursing into itself. It is a single field access, O(1),
+    // no recursion.
     #[must_use]
     pub fn as_slice(&self) -> &[u8] {
         self.0.as_slice()
@@ -173,6 +178,11 @@ impl HybridKem {
     /// Internal: [`crate::seal::generate_recipient_keypair`] is the stable
     /// entry point.
     ///
+    /// WHY: thin on purpose — fixes the RNG to `OsRng` so a normal caller
+    /// never has to choose one; `generate_with_rng`'s own doc comment
+    /// carries the entropy-injection rationale for the one caller (tests)
+    /// that needs a deterministically-failing source.
+    ///
     /// # Errors
     ///
     /// Returns [`SealError::Entropy`] if the OS entropy source fails.
@@ -186,6 +196,11 @@ impl HybridKem {
     /// HAZMAT: reachable only with the `hazmat` feature — no stability
     /// promise. A normal consumer calls
     /// [`crate::seal::generate_recipient_keypair`] instead.
+    ///
+    /// WHY: thin on purpose — fixes the RNG to `OsRng` so a normal caller
+    /// never has to choose one; `generate_with_rng`'s own doc comment
+    /// carries the entropy-injection rationale for the KAT gate's
+    /// deterministic-failure test.
     ///
     /// # Errors
     ///
@@ -226,6 +241,13 @@ impl HybridKem {
     /// promise. See [`generate`](Self::generate)'s doc comment for the
     /// entropy-source rationale; `tests/entropy_failure.rs` is the consumer
     /// (sphragis#16).
+    ///
+    /// WHY: HAZMAT-gates the injectable-RNG seam so the KAT/conformance
+    /// suite can supply a deterministically-failing source and prove the
+    /// typed-error path — the same rationale as the non-hazmat
+    /// `generate_with_rng` above, restated here because the two are
+    /// compiled under mutually exclusive `cfg`s and neither doc is visible
+    /// alongside the other.
     ///
     /// # Errors
     ///
@@ -273,6 +295,12 @@ impl DecapsulationKey {
     }
 
     /// Derives the matching public encapsulation key.
+    // kanon:ignore PERFORMANCE/missing-complexity-docs -- false positive (forkwright/kanon#3088):
+    // the rule's self-recursion detector is a bare substring match on `"encapsulation_key("`, so
+    // `dk_m.encapsulation_key()` (calling `ml_kem::DecapsulationKey`'s own method, a completely
+    // different type) reads as this function recursing into itself. It derives a keypair from a
+    // seed via one HKDF-shaped expansion, O(1) in the number of calls this makes -- no iteration
+    // over caller-controlled input, no recursion.
     #[must_use]
     pub fn encapsulation_key(&self) -> EncapsulationKey {
         let (dk_m, sk_x) = expand(&self.seed);

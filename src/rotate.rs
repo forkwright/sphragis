@@ -79,14 +79,18 @@ pub struct EpochId(pub u64);
 ///
 /// Content keys are otherwise entirely caller-managed: `seal_for`/`unseal`
 /// take and return them as bytes, and sphragis never chose them before now.
-/// This exists because rotation specifically needs a key **provably
-/// independent** of the one it replaces, and hand-rolling "32 secure random
-/// bytes" per call site is exactly the kind of question a caller should not
-/// have to answer for themselves.
+///
+/// WHY: a dedicated generator instead of inlining `OsRng` at each call
+/// site — rotation specifically needs a key **provably independent** of
+/// the one it replaces, and hand-rolling "32 secure random bytes" per call
+/// site is exactly the kind of question a caller should not have to
+/// answer for themselves.
 ///
 /// # Errors
 ///
 /// Returns [`SealError::Entropy`] if the OS entropy source fails.
+// kanon:ignore RUST/pub-visibility -- re-exported in lib.rs (forkwright/kanon#2382: standalone
+// published-crate exemption not yet implemented upstream)
 pub fn generate_content_key() -> Result<Zeroizing<[u8; CONTENT_KEY_LEN]>, SealError> {
     generate_content_key_with_rng(&mut OsRng)
 }
@@ -97,6 +101,8 @@ pub fn generate_content_key() -> Result<Zeroizing<[u8; CONTENT_KEY_LEN]>, SealEr
 /// # Errors
 ///
 /// Returns [`SealError::Entropy`] if `rng` fails to supply randomness.
+// kanon:ignore RUST/pub-visibility -- re-exported in lib.rs (forkwright/kanon#2382: standalone
+// published-crate exemption not yet implemented upstream)
 pub fn generate_content_key_with_rng<R: RngCore + CryptoRng>(
     rng: &mut R,
 ) -> Result<Zeroizing<[u8; CONTENT_KEY_LEN]>, SealError> {
@@ -117,6 +123,8 @@ pub fn generate_content_key_with_rng<R: RngCore + CryptoRng>(
 ///
 /// See the module documentation's boundary section for what rotating a key
 /// does and does not protect.
+// kanon:ignore RUST/pub-visibility -- re-exported in lib.rs (forkwright/kanon#2382: standalone
+// published-crate exemption not yet implemented upstream)
 #[must_use]
 pub struct PendingRotation<'k> {
     new_epoch: EpochId,

@@ -116,6 +116,11 @@ pub(crate) fn seal(
 ///
 /// Returns [`SealError::AeadOpen`] on a wrong key, wrong recipient, tampered
 /// ciphertext, or wrong associated data.
+// kanon:ignore PERFORMANCE/missing-complexity-docs -- false positive (forkwright/kanon#3088): the
+// iterator-adapter regex matches `Result::map` below identically to `Iterator::map`, but this
+// function contains no iteration or recursion at all -- one fixed-size AEAD decrypt, O(1) in the
+// number of calls this makes (the underlying AEAD's own cost is linear in `sealed.len()`, which
+// is a small wire-format constant here, not an unbounded input this rule is built to catch).
 pub(crate) fn open(
     wrap_key: &[u8; WRAP_KEY_LEN],
     nonce: &[u8; NONCE_LEN],

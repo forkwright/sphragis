@@ -72,6 +72,10 @@ pub struct RecipientId(#[serde(with = "serde_bytes")] pub [u8; 32]);
 
 impl RecipientId {
     /// Computes the id for an encapsulation key.
+    ///
+    /// WHY: thin on purpose — BLAKE3-hashing the encapsulation key's wire
+    /// bytes is the entire identity computation; a deeper interface here
+    /// would rename this one call, not add behavior.
     #[must_use]
     pub fn of(ek: &EncapsulationKey) -> Self {
         Self(blake3::hash(&ek.to_bytes()).into())
@@ -251,6 +255,11 @@ impl WrappedContentKey {
 /// envelope-vs-primitive boundary and the upstream-adapter seam this exists
 /// to keep stable across a future primitive-provider swap.
 ///
+/// WHY: thin on purpose — this is exactly `HybridKem::generate` renamed
+/// to the envelope-profile vocabulary; the indirection is the entire
+/// point (sphragis#23's stable-name boundary over a primitive that may be
+/// swapped for an upstream crate later), not a missing behavior.
+///
 /// # Errors
 ///
 /// Returns [`SealError::Entropy`] if the OS entropy source fails.
@@ -264,6 +273,12 @@ pub fn generate_recipient_keypair() -> Result<(DecapsulationKey, EncapsulationKe
 /// Returns one [`WrappedContentKey`] per recipient; all unseal to the same
 /// `content_key`. The order of the output matches `recipients`.
 ///
+/// WHY: thin on purpose — fixes the RNG to `OsRng`, mirroring
+/// `HybridKem::generate`'s own OS-vs-injectable split;
+/// `seal_for_with_rng`'s doc comment carries the injectable-entropy
+/// rationale for the one caller (tests) that needs a
+/// deterministically-failing source.
+///
 /// # Errors
 ///
 /// Returns a [`SealError`] if entropy generation, encapsulation, HKDF, or the
@@ -276,20 +291,17 @@ pub fn seal_for(
     seal_for_with_rng(content_key, recipients, &mut OsRng)
 }
 
+// kanon:ignore RUST/pub-visibility -- re-exported in lib.rs (forkwright/kanon#2382)
 /// Seals a content key for each recipient device using the given CSPRNG.
 ///
-/// WHY: isolates BOTH entropy draws per recipient — the KEM encapsulation
-/// randomness and the AEAD nonce — behind one injectable seam, so a test can
-/// fail the RNG partway through a multi-recipient batch and prove the loop
-/// returns [`SealError::Entropy`] with no [`WrappedContentKey`] emitted for
-/// any recipient, including ones already processed successfully: the early
-/// `?` return drops `out` before this function returns, so a caller never
-/// observes a partial wrap set.
+/// WHY: isolates both entropy draws (KEM encapsulation + AEAD nonce) per
+/// recipient behind one injectable seam, so a partial-batch RNG failure
+/// returns no partial wrap set (the early `?` drops `out` before
+/// returning). Time: O(n), Space: O(n) — n = `recipients.len()`.
 ///
 /// # Errors
 ///
-/// Returns a [`SealError`] if entropy generation, encapsulation, HKDF, or the
-/// AEAD seal fails for any recipient.
+/// Returns a [`SealError`] if entropy, encapsulation, HKDF, or AEAD fails.
 pub fn seal_for_with_rng<R: RngCore + CryptoRng>(
     content_key: &[u8; CONTENT_KEY_LEN],
     recipients: &[EncapsulationKey],

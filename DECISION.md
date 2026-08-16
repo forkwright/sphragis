@@ -158,7 +158,7 @@ workspace, akroasis PR #173).
   key-wrapping is a different concern; mixing them muddies both.
 - Standalone: the operator approved extraction so consumers outside akroasis
   can depend on this without a workspace coupling.
-- Designed for additional consumers: `sphragis` takes only byte arrays and its
+- Consumer-agnostic surface: `sphragis` takes only byte arrays and its
   own key types -- zero akroasis-domain coupling. `theke` sync, `arche` secrets,
   and any future fleet crypto consumer can depend on this repo directly.
 
@@ -219,7 +219,8 @@ replace). In outline, the gate executes:
 
 ## 8. Unverified / preview status
 
-Per #131 done-criterion 6, this lands explicitly **unaudited / Preview**:
+Per akroasis#131 done-criterion 6 (crypto lands preview-only until a
+cryptographic review closes it), this lands explicitly **unaudited / Preview**:
 - `preview-pq` feature, off by default; never in the default binary path.
 - Crate-level `//! WARNING` and a `#[deprecated]`-style notice in docs until
   cryptographic review.
@@ -344,24 +345,24 @@ shape and version do not change.
 **What this crate cannot do, stated once, plainly.** Ciphertext already
 written under the old content key stays readable by anyone holding that
 key, forever — rotation cannot retract a secret from memory it does not
-control, so it protects data written *after* the epoch switch, not data
-written before it. `tests/rotation.rs` is the adversarial proof: a device
-that recovers the old key before rotation runs remains able to decrypt data
-already protected under it, and specifically fails to decrypt data
-protected under the completed new epoch — the property the issue's
-evidence found the prior test never modeled. Whether a consumer
-re-encrypts its already-stored payloads under the new key is a decision
-sphragis has no way to make or enforce, because it never touches payload
-data; the conservative default is that rotation does not attempt it, and
-`rotate`'s module doc says so rather than leaving a reader to assume
+control, so it protects payloads written *after* the epoch switch, not
+payloads written before it. `tests/rotation.rs` is the adversarial proof: a
+device that recovers the old key before rotation runs remains able to
+decrypt payloads already protected under it, and specifically fails to
+decrypt payloads protected under the completed new epoch — the property
+the issue's evidence found the prior test never modeled. Whether a
+consumer re-encrypts its already-stored payloads under the new key is a
+decision sphragis has no way to make or enforce, because it never touches
+payloads; the conservative default is that rotation does not attempt it,
+and `rotate`'s module doc says so rather than leaving a reader to assume
 otherwise.
 
 **Design decisions the issue left open:**
-- *Does rotation re-encrypt existing payloads, or only protect data going
-  forward?* Forward-only, by construction (the crate has no payload to act
-  on) — the conservative reading, chosen explicitly rather than left
-  ambiguous. A consumer that wants old data re-protected performs that
-  itself, against its own store.
+- *Does rotation re-encrypt existing payloads, or only protect payloads
+  written after the switch?* Forward-only, by construction (the crate has
+  no payload to act on) — the conservative reading, chosen explicitly
+  rather than left ambiguous. A consumer that wants old payloads
+  re-protected performs that itself, against its own store.
 - *Who allocates the epoch identifier `rotate::EpochId` carries through the
   protocol?* The caller, not sphragis: this crate holds no persistent state
   across calls, so it cannot allocate or validate a monotonic sequence

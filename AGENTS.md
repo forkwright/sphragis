@@ -19,8 +19,10 @@ src/
   rotate.rs    — typed key-rotation protocol (actual device revocation, sphragis#14)
   error.rs     — SealError (snafu)
 tests/
-  known_answer_vectors.rs — X-Wing KAT, FIPS-203 ML-KEM-768 ACVP KAT, RFC KATs,
-                             round-trip, negatives
+  known_answer_vectors.rs — X-Wing KAT, FIPS-203 ML-KEM-768 ACVP KAT, RFC KATs
+  seal_roundtrip.rs        — envelope API: round-trip, multi-recipient, negatives,
+                             wire/parse boundaries (split from known_answer_vectors.rs,
+                             forkwright/sphragis#37)
   rotation.rs              — adversarial revocation proof: a device holding the
                              old content key fails to read the completed new epoch
   provenance_lock.rs      — enforces crypto-provenance.toml against Cargo.lock
@@ -33,8 +35,10 @@ DECISION.md    — full rationale: why hybrid, why X-Wing, why this envelope
 
 ## Status
 
-Unaudited preview. All crypto behind `preview-pq`. First consumer: akroasis
-(`pinax` reference store). Gate: `cargo test --features preview-pq` green.
+Unaudited preview: every cryptographic operation lives behind the
+`preview-pq` feature flag, off by default, so the crate ships inert until a
+caller opts in explicitly. First consumer: akroasis (`pinax` reference
+store). Gate: `cargo test --features preview-pq` green.
 
 ## Known design constraints
 
