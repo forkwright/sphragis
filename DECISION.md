@@ -125,12 +125,22 @@ Key-wrapping choice — **ChaCha20-Poly1305, not AES-KW**:
   "AES-GCM/AES-KW" were offered as options, not mandates; this is the
   better-justified envelope for *this* stack.
 
-Multi-device + revocation:
+Multi-device key distribution vs. revocation (sphragis#14):
 - `seal_for(content_key, recipients) -> Vec<WrappedContentKey>` — one wrap per
-  device, all decapsulating to the same content key.
-- Revoke a device = re-run `seal_for` over the remaining recipients with a freshly
-  generated content key (forward-secret rotation) or the same content key
-  (cheap revoke) — the consuming store picks the policy; `sphragis` exposes both.
+  device, all decapsulating to the same content key. This **distributes** a
+  content key; it has no memory of who has ever recovered one, so re-running
+  it over a smaller recipient list only changes who receives the *next*
+  wrap — a recipient who already unsealed the key keeps it regardless.
+  Describing that as revocation (this section previously did, calling the
+  same-key case a "cheap revoke") is a security-contract failure: a consumer
+  who implements it believes access was removed when the former device
+  still holds the only secret needed to read current and future ciphertext
+  under that key.
+- Actual revocation is `rotate`'s typed protocol (§11): a new key,
+  independent of the old one, wrapped only for the retained set, switched to
+  atomically (from the consumer's side), with the old key then retired.
+  Ciphertext already written under the old key is unaffected either way —
+  see §11 for the boundary this crate cannot cross.
 
 Crypto-agility / versioning:
 - `version: u8` in the wire struct + the domain tag string both carry `v1`.
@@ -164,10 +174,13 @@ workspace, akroasis PR #173).
 | `chacha20poly1305` | 0.10 | envelope AEAD (already a workspace dep) |
 | `zeroize`, `blake3`, `ciborium`, `snafu` | workspace | hygiene/serde/errors |
 
-No direct `subtle` dependency: the crate compares only public values
-(`RecipientId` is the BLAKE3 hash of a public encapsulation key, carried in
-plaintext on the wire). The one secret-dependent comparison — the Poly1305 tag
-check — happens inside `chacha20poly1305`, which uses `subtle` internally.
+`subtle` is a direct dependency as of §11 (key rotation): `rotate::PendingRotation::begin`
+is this crate's first *direct* secret-vs-secret comparison (the new epoch's
+content key against the one it replaces), so it needs `subtle::ConstantTimeEq`
+explicitly rather than relying on a transitive copy. Every other comparison in
+the crate is over public values (`RecipientId` is the BLAKE3 hash of a public
+encapsulation key, carried in plaintext on the wire), or is the Poly1305 tag
+check inside `chacha20poly1305`, which already uses `subtle` internally.
 
 Deliberately NOT the `x-wing` crate (0.1.0-rc.0): it pins a *release-candidate*
 stack (`ml-kem 0.3.0-rc.0`, `x25519-dalek 3.0.0-pre.6`, `sha3 0.11.0-rc.7`) and
@@ -306,3 +319,67 @@ unverified claim. `rand_core`'s `std` feature is enabled (in addition to
 `getrandom`) so `rand_core::Error` implements `std::error::Error` and can
 sit behind `SealError::Entropy`'s `source` field with a real chain, rather
 than being flattened to a string.
+
+## 11. Key rotation is revocation; `seal_for` alone is not (sphragis#14)
+
+§4's original "Multi-device + revocation" text called re-running `seal_for`
+over a smaller recipient list — optionally with a fresh content key —
+revocation, including a "cheap revoke" that reused the same key. That is
+wrong: a device that has ever unsealed a content key retains it regardless
+of whether a later `seal_for` call addresses it, so omitting a wrap changes
+who receives the *next* one, not what a former recipient already holds. The
+`rotate` module (`src/rotate.rs`) replaces that guidance with a typed
+protocol and this section replaces the misnamed one.
+
+**Protocol.** Five stages, enforced in order by a typestate chain
+(`PendingRotation -> PublishedWraps -> CommittedEpoch -> RotationComplete`)
+so the ordering is a compile error to violate, not a convention to remember:
+new content key -> publish wraps for the retained recipients -> the consumer
+durably persists those wraps as the epoch's live set -> `commit()`
+acknowledges the switch -> `retire_old_key()` erases the orchestrating
+caller's copy of the old key. Wire-compatible: rotation calls the same
+`seal_for_with_rng` internals `seal_for` does, so `WrappedContentKey`'s CBOR
+shape and version do not change.
+
+**What this crate cannot do, stated once, plainly.** Ciphertext already
+written under the old content key stays readable by anyone holding that
+key, forever — rotation cannot retract a secret from memory it does not
+control, so it protects data written *after* the epoch switch, not data
+written before it. `tests/rotation.rs` is the adversarial proof: a device
+that recovers the old key before rotation runs remains able to decrypt data
+already protected under it, and specifically fails to decrypt data
+protected under the completed new epoch — the property the issue's
+evidence found the prior test never modeled. Whether a consumer
+re-encrypts its already-stored payloads under the new key is a decision
+sphragis has no way to make or enforce, because it never touches payload
+data; the conservative default is that rotation does not attempt it, and
+`rotate`'s module doc says so rather than leaving a reader to assume
+otherwise.
+
+**Design decisions the issue left open:**
+- *Does rotation re-encrypt existing payloads, or only protect data going
+  forward?* Forward-only, by construction (the crate has no payload to act
+  on) — the conservative reading, chosen explicitly rather than left
+  ambiguous. A consumer that wants old data re-protected performs that
+  itself, against its own store.
+- *Who allocates the epoch identifier `rotate::EpochId` carries through the
+  protocol?* The caller, not sphragis: this crate holds no persistent state
+  across calls, so it cannot allocate or validate a monotonic sequence
+  itself — that bookkeeping already belongs to whatever store tracks "which
+  wrap set is current" for a device. `EpochId` is an opaque `u64` sphragis
+  carries through the typestate chain unmodified, mirroring how content-key
+  generation itself has always been caller-visible (`generate_content_key`
+  exists for convenience, not because sphragis owns key material lifecycle).
+- *What does "atomically switch the epoch" mean for a crate with no
+  storage?* Only the consumer's own store transaction can make an epoch
+  switch atomic. `PublishedWraps::commit()` cannot perform that transaction;
+  what it can and does guarantee is ordering — the type system refuses to
+  produce a `CommittedEpoch` (and therefore refuses `retire_old_key`) until
+  the caller has called `commit()`, so the old key cannot be destroyed
+  before the caller has at least acknowledged the new epoch is durably live.
+- *Same-key rotation.* `PendingRotation::begin` rejects a new content key
+  equal to the old one (`SealError::ContentKeyUnchanged`), compared via
+  `subtle::ConstantTimeEq` since both operands are secret (see §6). Without
+  this check a caller could accidentally rotate into a no-op that produces a
+  full new wrap set while changing nothing a revoked recipient cannot
+  already decrypt.

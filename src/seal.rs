@@ -1,8 +1,11 @@
 //! Multi-recipient content-key sealing.
 //!
-//! Wraps one content key separately for each recipient device. Revoking a device
-//! means re-sealing the (optionally rotated) content key for the remaining
-//! recipients only.
+//! Wraps one content key separately for each recipient device. This module
+//! only distributes keys — it has no memory of who has ever recovered one,
+//! so re-sealing for a smaller recipient set removes a recipient from the
+//! *next* wrap set without touching what a recipient who already unsealed
+//! the key still holds. That is not revocation (sphragis#14); the typed
+//! protocol that actually is lives in [`crate::rotate`].
 
 use rand_core::{CryptoRng, OsRng, RngCore};
 use serde::{Deserialize, Serialize};
