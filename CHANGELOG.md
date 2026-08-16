@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/forkwright/sphragis/compare/v0.2.0...v0.2.1) (2026-08-16)
+
+
+### Bug Fixes
+
+* **ci:** run CI on a pull request whose base is not main ([#35](https://github.com/forkwright/sphragis/issues/35)) ([77c86c8](https://github.com/forkwright/sphragis/commit/77c86c848d3925d214f00bead539de24c43c9cff))
+
 ## [0.2.0](https://github.com/forkwright/sphragis/compare/v0.1.2...v0.2.0) (2026-08-16)
 
 
