@@ -121,7 +121,7 @@ optional = true
 hex-literal = "0.4" # kanon:ignore TOML/missing-workspace-inheritance -- standalone [package], no workspace ancestor (kanon#3088)
 # WHY: tests/inert_default.rs parses this manifest to lock the packaging
 # invariant (default feature set empty, all crypto deps optional).
-toml = "0.8" # kanon:ignore TOML/missing-workspace-inheritance -- standalone [package], no workspace ancestor (kanon#3088)
+toml = "1.1" # kanon:ignore TOML/missing-workspace-inheritance -- standalone [package], no workspace ancestor (kanon#3088)
 hkdf = { version = "0.13" }
 sha2 = { version = "0.11" }
 x25519-dalek = { version = "2.0.1", features = ["static_secrets"] }
