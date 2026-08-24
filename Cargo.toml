@@ -77,7 +77,7 @@ ciborium = "0.2" # kanon:ignore TOML/missing-workspace-inheritance -- standalone
 serde_bytes = "0.11" # kanon:ignore TOML/missing-workspace-inheritance -- standalone [package], no workspace ancestor (kanon#3088)
 # WHY: sha3 0.11 (ml-kem's own digest generation) — its `zeroize` feature wipes
 # hasher + XOF-reader state on drop; 0.10 offers no digest-state zeroization.
-sha3 = { version = "0.11", features = ["zeroize"], optional = true }
+sha3 = { version = "0.12", features = ["zeroize"], optional = true }
 # WHY: sha2 0.11 `zeroize` wipes Sha256 core state + block buffers on drop
 # (digest 0.11 generation, shared with sha3 0.11 / ml-kem); hkdf 0.13 + its
 # hmac 0.13 drop-cascade through those impls, so the HKDF PRK-keyed HMAC state
