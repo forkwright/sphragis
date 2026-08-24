@@ -63,7 +63,7 @@ preview-pq = [
 hazmat = ["preview-pq"]
 
 [dependencies]
-snafu = "0.8" # kanon:ignore TOML/missing-workspace-inheritance -- sphragis is a standalone `[package]`, not a workspace member (forkwright/kanon#3088); there is no workspace-level dependencies table to inherit from
+snafu = "0.9" # kanon:ignore TOML/missing-workspace-inheritance -- sphragis is a standalone `[package]`, not a workspace member (forkwright/kanon#3088); there is no workspace-level dependencies table to inherit from
 zeroize = { version = "1", features = ["derive"] }
 blake3 = "1" # kanon:ignore TOML/missing-workspace-inheritance -- standalone [package], no workspace ancestor (kanon#3088)
 serde = { version = "1", features = ["derive"] }
