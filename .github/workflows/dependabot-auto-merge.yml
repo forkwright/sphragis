@@ -13,4 +13,11 @@ concurrency:
 
 jobs:
   dependabot-auto-merge:
-    uses: forkwright/.github/.github/workflows/dependabot-auto-merge.yml@d5685976eaf7c40f4aede2a7893408ee1a152201
+    # WHY @main, not a pinned SHA: forkwright/.github publishes no tags, so a
+    # SHA pin here has no dependabot bump path and just freezes -- a pin that
+    # looks maintained but silently never moves. forkwright/.github is
+    # first-party -- same org, same trust boundary -- not the third-party
+    # supply-chain case a SHA pin defends against. Fleet convention: triggers,
+    # permissions and inputs live in the caller, logic is delegated, callers
+    # pin @main.
+    uses: forkwright/.github/.github/workflows/dependabot-auto-merge.yml@main
