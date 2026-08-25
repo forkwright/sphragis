@@ -29,8 +29,9 @@ allow = [
 confidence-threshold = 0.8
 
 [bans]
-# WHY: rand_core 0.6 (x25519-dalek call sites) and 0.10 (ml-kem transitive)
-# coexist by design; see DECISION.md section 6.
+# WHY: rand_core 0.6 (this crate's own injectable-entropy seams) and 0.10
+# (ml-kem + x25519-dalek, both transitive) coexist by design; see DECISION.md
+# section 6.
 multiple-versions = "warn"
 wildcards = "deny"
 

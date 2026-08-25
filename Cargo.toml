@@ -85,7 +85,10 @@ sha3 = { version = "0.11", features = ["zeroize"], optional = true }
 # leaf `Drop` impls are the mechanism.
 sha2 = { version = "0.11", features = ["zeroize"], optional = true }
 hkdf = { version = "0.13", optional = true }
-chacha20poly1305 = { version = "0.10", optional = true }
+# WHY: `zeroize` is what gives `ChaChaPoly1305::drop` a non-empty body (it wipes
+# the AEAD key) and supplies `ZeroizeOnDrop`; it is not a default feature, so
+# omitting it silently leaves the wrap key in freed memory.
+chacha20poly1305 = { version = "0.11", features = ["zeroize"], optional = true }
 # WHY: `rotate::PendingRotation::begin` is this crate's first *direct*
 # secret-vs-secret comparison (the new epoch's content key against the one
 # it replaces) -- every prior comparison either operates on public data
@@ -113,7 +116,7 @@ features = ["hazmat", "zeroize"]
 optional = true
 
 [dependencies.x25519-dalek]
-version = "2.0.1"
+version = "3.0.0"
 features = ["static_secrets", "zeroize"]
 optional = true
 
@@ -124,7 +127,7 @@ hex-literal = "1.1" # kanon:ignore TOML/missing-workspace-inheritance -- standal
 toml = "1.1" # kanon:ignore TOML/missing-workspace-inheritance -- standalone [package], no workspace ancestor (kanon#3088)
 hkdf = { version = "0.13" }
 sha2 = { version = "0.11" }
-x25519-dalek = { version = "2.0.1", features = ["static_secrets"] }
+x25519-dalek = { version = "3.0.0", features = ["static_secrets"] }
 # WHY: decoder property coverage for WrappedContentKey::from_cbor per the
 # fleet parser/decoder testing standard; proptest-regressions/ is tracked.
 proptest = "1" # kanon:ignore TOML/missing-workspace-inheritance -- standalone [package], no workspace ancestor (kanon#3088)

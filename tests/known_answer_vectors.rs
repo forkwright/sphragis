@@ -236,10 +236,10 @@ fn chacha20poly1305_rfc8439_2_8_2() {
         "1ae10b594f09e26a7e902ecbd0600691"
     );
 
-    let cipher = ChaCha20Poly1305::new(Key::from_slice(&key));
+    let cipher = ChaCha20Poly1305::new(<&Key>::from(&key));
     let sealed = cipher
         .encrypt(
-            Nonce::from_slice(&nonce),
+            <&Nonce>::from(&nonce),
             Payload {
                 msg: &plaintext,
                 aad: &aad,
@@ -253,7 +253,7 @@ fn chacha20poly1305_rfc8439_2_8_2() {
 
     let opened = cipher
         .decrypt(
-            Nonce::from_slice(&nonce),
+            <&Nonce>::from(&nonce),
             Payload {
                 msg: &sealed,
                 aad: &aad,
@@ -271,7 +271,7 @@ fn chacha20poly1305_rfc8439_2_8_2() {
     assert!(
         cipher
             .decrypt(
-                Nonce::from_slice(&nonce),
+                <&Nonce>::from(&nonce),
                 Payload {
                     msg: &tampered,
                     aad: &aad
