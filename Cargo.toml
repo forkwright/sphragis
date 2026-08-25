@@ -113,7 +113,7 @@ features = ["hazmat", "zeroize"]
 optional = true
 
 [dependencies.x25519-dalek]
-version = "2.0.1"
+version = "3.0.0"
 features = ["static_secrets", "zeroize"]
 optional = true
 
@@ -124,7 +124,7 @@ hex-literal = "1.1" # kanon:ignore TOML/missing-workspace-inheritance -- standal
 toml = "1.1" # kanon:ignore TOML/missing-workspace-inheritance -- standalone [package], no workspace ancestor (kanon#3088)
 hkdf = { version = "0.13" }
 sha2 = { version = "0.11" }
-x25519-dalek = { version = "2.0.1", features = ["static_secrets"] }
+x25519-dalek = { version = "3.0.0", features = ["static_secrets"] }
 # WHY: decoder property coverage for WrappedContentKey::from_cbor per the
 # fleet parser/decoder testing standard; proptest-regressions/ is tracked.
 proptest = "1" # kanon:ignore TOML/missing-workspace-inheritance -- standalone [package], no workspace ancestor (kanon#3088)
