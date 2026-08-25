@@ -110,9 +110,9 @@ fn generate_with_rng_returns_entropy_error_not_panic() {
         "the underlying RNG failure text must be reachable, got {source}"
     );
     assert!(
-        location.file.ends_with("hybrid.rs"),
+        location.file().ends_with("hybrid.rs"),
         "the implicit location must name the failing call site, got {}",
-        location.file
+        location.file()
     );
 }
 
@@ -170,9 +170,9 @@ fn seal_for_with_rng_returns_entropy_error_when_nonce_entropy_fails() {
         panic!("expected SealError::Entropy from the nonce draw, got {result:?}");
     };
     assert!(
-        location.file.ends_with("seal.rs"),
+        location.file().ends_with("seal.rs"),
         "the nonce draw's entropy failure must be located in seal.rs, got {}",
-        location.file
+        location.file()
     );
 }
 

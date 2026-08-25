@@ -231,9 +231,9 @@ fn wrong_length_ek_and_ct_rejected() {
         panic!("expected SealError::WrongLength");
     };
     assert!(
-        location.file.ends_with("hybrid.rs"),
+        location.file().ends_with("hybrid.rs"),
         "the implicit location must name the failing call site, got {}",
-        location.file
+        location.file()
     );
 }
 
