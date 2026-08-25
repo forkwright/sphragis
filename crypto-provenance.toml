@@ -173,7 +173,7 @@ locked_version = "0.3.2"
 
 [[dependency]]
 crate = "x25519-dalek"
-locked_version = "2.0.1"
+locked_version = "3.0.0"
 
 [[dependency]]
 crate = "sha3"
@@ -189,4 +189,4 @@ locked_version = "0.13.0"
 
 [[dependency]]
 crate = "chacha20poly1305"
-locked_version = "0.10.1"
+locked_version = "0.11.0"

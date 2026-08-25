@@ -164,15 +164,19 @@ workspace, akroasis PR #173).
 
 ## 6. Dependencies (released, no release-candidates)
 
-| Crate | Version | Role |
-|---|---|---|
-| `ml-kem` | 0.3.2 | FIPS-203 ML-KEM-768 (RustCrypto) |
-| `x25519-dalek` | 2.0.1 | X25519 (already a workspace dep) |
-| `sha3` | 0.11 | SHA3-256 combiner + SHAKE-256 seed expansion (`zeroize` feature wipes digest/XOF state on drop; same digest generation as `ml-kem`) |
-| `sha2` | 0.10 | HKDF-SHA256 hash |
-| `hkdf` | 0.12 | RFC 5869 extract/expand (digest 0.10 generation — coherent with `sha2` 0.10; hkdf 0.13 requires sha2 0.11 and is incompatible) |
-| `chacha20poly1305` | 0.10 | envelope AEAD (already a workspace dep) |
-| `zeroize`, `blake3`, `ciborium`, `snafu` | workspace | hygiene/serde/errors |
+| Crate | Role |
+|---|---|
+| `ml-kem` | FIPS-203 ML-KEM-768 (RustCrypto) |
+| `x25519-dalek` | X25519 |
+| `sha3` | SHA3-256 combiner + SHAKE-256 seed expansion (`zeroize` feature wipes digest/XOF state on drop; same digest generation as `ml-kem`) |
+| `sha2` | HKDF-SHA256 hash (`zeroize` feature wipes the HMAC-keyed core and block buffers on drop) |
+| `hkdf` | RFC 5869 extract/expand, over `sha2`'s digest generation |
+| `chacha20poly1305` | envelope AEAD (`zeroize` feature wipes the AEAD key on drop) |
+| `zeroize`, `blake3`, `ciborium`, `snafu` | hygiene/serde/errors |
+
+Pinned versions are deliberately not restated here: `crypto-provenance.toml`'s
+`[[dependency]]` table is the SSOT, and `tests/provenance_lock.rs` asserts it
+against what `Cargo.lock` resolves.
 
 `subtle` is a direct dependency as of §11 (key rotation): `rotate::PendingRotation::begin`
 is this crate's first *direct* secret-vs-secret comparison (the new epoch's
@@ -190,10 +194,11 @@ primitives and gate it on X-Wing's own published KAT — correctness is proven b
 the vector, and the trusted-compute base stays on shipped crates. `x-wing` is the
 migration target once it reaches a stable release and an audit.
 
-`rand_core` coexistence: `ml-kem` 0.3.2's high-level API is `getrandom`-backed
-(no rng handle), so it pulls `rand_core 0.10` purely transitively; `x25519-dalek`
-2.0.1 uses `rand_core 0.6` at our call sites. The two majors coexist with no
-call-site clash.
+`rand_core` coexistence: this crate's injectable-entropy seams take a
+`rand_core` 0.6 handle and use it only to fill byte buffers it owns
+(`generate_with_rng_impl`, `encapsulate_with_rng_impl`). Those bytes are what
+reach `ml-kem` and `x25519-dalek` — no rng handle crosses either boundary — so
+the `rand_core` major they pull transitively never meets ours at a call site.
 
 ## 7. Acceptance gate (KATs)
 

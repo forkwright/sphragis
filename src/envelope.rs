@@ -98,10 +98,10 @@ pub(crate) fn seal(
     content_key: &[u8],
     aad: &[u8],
 ) -> Result<Vec<u8>, SealError> {
-    let cipher = ChaCha20Poly1305::new(Key::from_slice(wrap_key));
+    let cipher = ChaCha20Poly1305::new(<&Key>::from(wrap_key));
     cipher
         .encrypt(
-            Nonce::from_slice(nonce),
+            <&Nonce>::from(nonce),
             Payload {
                 msg: content_key,
                 aad,
@@ -127,9 +127,9 @@ pub(crate) fn open(
     sealed: &[u8],
     aad: &[u8],
 ) -> Result<Zeroizing<Vec<u8>>, SealError> {
-    let cipher = ChaCha20Poly1305::new(Key::from_slice(wrap_key));
+    let cipher = ChaCha20Poly1305::new(<&Key>::from(wrap_key));
     cipher
-        .decrypt(Nonce::from_slice(nonce), Payload { msg: sealed, aad })
+        .decrypt(<&Nonce>::from(nonce), Payload { msg: sealed, aad })
         .map(Zeroizing::new)
         .map_err(|_| AeadOpenSnafu.build())
 }

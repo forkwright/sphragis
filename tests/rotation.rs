@@ -30,10 +30,10 @@ fn store_encrypt(
     nonce: &[u8; 12],
     plaintext: &[u8],
 ) -> Vec<u8> {
-    let cipher = ChaCha20Poly1305::new(Key::from_slice(content_key));
+    let cipher = ChaCha20Poly1305::new(<&Key>::from(content_key));
     cipher
         .encrypt(
-            Nonce::from_slice(nonce),
+            <&Nonce>::from(nonce),
             Payload {
                 msg: plaintext,
                 aad: b"",
@@ -51,10 +51,10 @@ fn store_decrypt(
     nonce: &[u8; 12],
     ciphertext: &[u8],
 ) -> Option<Vec<u8>> {
-    let cipher = ChaCha20Poly1305::new(Key::from_slice(content_key));
+    let cipher = ChaCha20Poly1305::new(<&Key>::from(content_key));
     cipher
         .decrypt(
-            Nonce::from_slice(nonce),
+            <&Nonce>::from(nonce),
             Payload {
                 msg: ciphertext,
                 aad: b"",

@@ -1,7 +1,9 @@
 //! X-Wing hybrid KEM (X25519 + ML-KEM-768).
 //!
-//! Faithful transcription of `draft-connolly-cfrg-xwing-kem` over the released
-//! `RustCrypto` primitives (`ml-kem` 0.3, `x25519-dalek` 2, `sha3` 0.10). The
+//! Faithful transcription of `draft-connolly-cfrg-xwing-kem` over released
+//! `RustCrypto` primitives. The draft revision this is bound to, and the pinned
+//! version of every crate the construction was verified against, live in
+//! `crypto-provenance.toml` and are enforced by `tests/provenance_lock.rs`. The
 //! combiner binds the ML-KEM shared secret (first, per FIPS SP 800-56C ordering),
 //! the X25519 shared secret, the X25519 ciphertext, and the recipient X25519
 //! public key, under the X-Wing domain label.
