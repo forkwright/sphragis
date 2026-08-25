@@ -118,7 +118,7 @@ features = ["static_secrets", "zeroize"]
 optional = true
 
 [dev-dependencies]
-hex-literal = "0.4" # kanon:ignore TOML/missing-workspace-inheritance -- standalone [package], no workspace ancestor (kanon#3088)
+hex-literal = "1.1" # kanon:ignore TOML/missing-workspace-inheritance -- standalone [package], no workspace ancestor (kanon#3088)
 # WHY: tests/inert_default.rs parses this manifest to lock the packaging
 # invariant (default feature set empty, all crypto deps optional).
 toml = "0.8" # kanon:ignore TOML/missing-workspace-inheritance -- standalone [package], no workspace ancestor (kanon#3088)
