@@ -109,7 +109,10 @@ features = ["getrandom", "std"]
 optional = true
 
 # Post-quantum hybrid KEM stack (preview-pq only).
-# WHY: released RustCrypto primitives, not the rc-pinned `x-wing` aggregate crate.
+# WHY(sphragis#43, sphragis#62): RustCrypto x-wing 0.1.0 is published, but its
+# security warning says it has never been independently audited. Retain this
+# exact local provider graph as the review target; any migration requires its
+# own exact-graph review.
 [dependencies.ml-kem]
 version = "0.3.2"
 features = ["hazmat", "zeroize"]
