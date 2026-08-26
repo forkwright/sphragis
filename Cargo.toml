@@ -43,7 +43,7 @@ required-features = ["preview-pq", "hazmat"]
 [features]
 default = []
 # WHY: unaudited hybrid post-quantum cryptography. Never in the default binary
-# path. Gated until cryptographic review per akroasis#131 done-criterion 6.
+# path. Gated until the independent cryptographic review in sphragis#43.
 preview-pq = [
     "dep:ml-kem",
     "dep:x25519-dalek",

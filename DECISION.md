@@ -225,8 +225,8 @@ replace). In outline, the gate executes:
 
 ## 8. Unverified / preview status
 
-Per akroasis#131 done-criterion 6 (crypto lands preview-only until a
-cryptographic review closes it), this lands explicitly **unaudited / Preview**:
+Until sphragis#43 records a favorable independent cryptographic review, this
+remains explicitly **unaudited / Preview**:
 - `preview-pq` feature, off by default; never in the default binary path.
 - Crate-level `//! WARNING` and a `#[deprecated]`-style notice in docs until
   cryptographic review.
