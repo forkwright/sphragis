@@ -228,7 +228,7 @@ replace). In outline, the gate executes:
 Until sphragis#43 records a favorable independent cryptographic review, this
 remains explicitly **unaudited / Preview**:
 - `preview-pq` feature, off by default; never in the default binary path.
-- Crate-level `//! WARNING` and a `#[deprecated]`-style notice in docs until
+- Crate-level **UNAUDITED PREVIEW** warning in the public crate docs until
   cryptographic review.
 - The KATs prove the construction matches the published standard; they do **not**
   substitute for an audit of the implementation.

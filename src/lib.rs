@@ -17,7 +17,7 @@
 //! WARNING: this is unaudited cryptography behind the `preview-pq` feature. The
 //! known-answer tests prove the construction matches the published standards;
 //! they do not substitute for a cryptographic review. Do not use on the default
-//! binary path. See `DECISION.md` and akroasis#131.
+//! binary path. See `DECISION.md` and sphragis#43.
 //!
 //! # Public surface — envelope profile, not a primitive library (sphragis#23)
 //!
