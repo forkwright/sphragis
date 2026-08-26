@@ -29,14 +29,14 @@ Universal: `crates/basanos/standards/STANDARDS.md` in `forkwright/kanon`
 ## Testing
 
 ```bash
-cargo test --features preview-pq        # all tests incl. X-Wing KAT
+cargo test --features preview-pq,hazmat # full suite incl. X-Wing KAT
 cargo clippy --all-targets --features preview-pq -- -D warnings
 cargo fmt --all -- --check
 ```
 
 ## Before submitting
 
-1. `cargo test --features preview-pq` passes
+1. `cargo test --features preview-pq,hazmat` passes
 2. `cargo clippy --all-targets --features preview-pq -- -D warnings` passes
 3. `cargo fmt --all -- --check` clean
 4. Gate-Passed trailer present on commit

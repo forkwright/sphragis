@@ -45,8 +45,9 @@ jobs:
         with:
           # WHY: run every check explicitly so a schema regression in one
           # section can't silently disable the others. cargo-deny expects
-          # the check subcommand followed by space-separated check names;
-          # `arguments:` passes post-subcommand flags only.
+          # the check subcommand followed by space-separated check names.
+          # `arguments:` carries global flags before the subcommand; flags
+          # after `check` belong in `command-arguments:`.
           command: check advisories licenses bans sources
           arguments: --all-features
 

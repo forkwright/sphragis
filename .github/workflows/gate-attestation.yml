@@ -51,9 +51,6 @@
 # build cost a second time regardless of trailer state. Recommend leaving
 # ci.yml as-is (informational, non-required) unless CI-minute spend becomes
 # a concern.
-#
-# NOTE: sphragis#10 (toolchain-pin PR) independently fails `cargo audit`
-# today, unrelated to this gate migration — needs its own fix regardless.
 name: Gate Attestation
 
 on:
