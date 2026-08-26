@@ -26,19 +26,13 @@
 # build OOM per that file's own WHY comment, not applicable here).
 #
 # DISCREPANCY: sphragis is a single [package], not a [workspace] — no
-# --workspace flag on any stage. ci.yml runs check/clippy/test TWICE per PR
-# (default features, then --features preview-pq); hybrid-gate.yml's inputs
-# are single-string, so both feature-set runs are chained with `&&` below to
-# preserve full ci.yml coverage in one command.
+# --workspace flag on any stage. ci.yml runs check/clippy/test for default,
+# preview-pq, and preview-pq+hazmat; hybrid-gate.yml's inputs are single
+# strings, so all three feature profiles are chained with `&&` below.
 #
-# UNVERIFIED: sphragis has NEVER run cargo-nextest — both ci.yml and
-# .kanon-ci.toml use plain `cargo test`. nextest_cmd below substitutes
-# `cargo nextest run` per fleet convention; unconfirmed until full-gate-build
-# is watched green on the adoption PR (nextest discovering the same tests/
-# integration suite + src/ unit tests as `cargo test` did). Because nextest
-# does not run doctests, doctest_cmd is added below (chained per feature
-# set) to keep the doctest coverage `cargo test --features preview-pq`
-# implicitly had — this is a net-new explicit stage, not a 1:1 mirror.
+# WHY nextest + doctest: the reusable gate's test stage uses cargo-nextest,
+# while ci.yml and .kanon-ci.toml use cargo test. Because nextest does not run
+# doctests, doctest_cmd explicitly covers all three feature profiles too.
 #
 # rust_toolchain is left unset (empty-string default) so hybrid-gate.yml's
 # actions-rust-lang/setup-rust-toolchain step auto-detects from this repo's
@@ -52,7 +46,7 @@
 #
 # DOUBLE-BUILD-COST FLAG: ci.yml (fmt/check/clippy/test, on: pull_request +
 # push:main) is NOT currently in branch-protection required_status_checks
-# (only "gate / gate-attestation", "cargo deny", "cargo audit" are) — so this
+# (only "gate / gate", "cargo deny", "cargo audit" are) — so this
 # is a CI-MINUTES duplication, not a merge-latency one: once full-gate-build
 # also runs these commands for trailer-less PRs, every PR still pays ci.yml's
 # build cost a second time regardless of trailer state. Recommend leaving
@@ -94,13 +88,15 @@ jobs:
     uses: forkwright/.github/.github/workflows/hybrid-gate.yml@main
     with:
       fmt_cmd: "cargo fmt --all -- --check"
-      check_cmd: "cargo check --all-targets && cargo check --all-targets --features preview-pq"
-      clippy_cmd: "cargo clippy --all-targets -- -D warnings && cargo clippy --all-targets --features preview-pq -- -D warnings"
-      nextest_cmd: "cargo nextest run && cargo nextest run --features preview-pq"
-      doctest_cmd: "cargo test --doc && cargo test --doc --features preview-pq"
+      check_cmd: "cargo check --all-targets && cargo check --all-targets --features preview-pq && cargo check --all-targets --features preview-pq,hazmat"
+      clippy_cmd: "cargo clippy --all-targets -- -D warnings && cargo clippy --all-targets --features preview-pq -- -D warnings && cargo clippy --all-targets --features preview-pq,hazmat -- -D warnings"
+      nextest_cmd: "cargo nextest run && cargo nextest run --features preview-pq && cargo nextest run --features preview-pq,hazmat"
+      doctest_cmd: "cargo test --doc && cargo test --doc --features preview-pq && cargo test --doc --features preview-pq,hazmat"
       system_packages: ""
       needs_fleet_repo_token: false
       rust_cache_key: "gate-attestation"
       ai_attribution_check: true
-      docs_only_exemption: true
+      # WHY(sphragis#43): CI topology and review-status prose are security
+      # boundaries, so docs-only changes must exercise the fitness test.
+      docs_only_exemption: false
     secrets: inherit

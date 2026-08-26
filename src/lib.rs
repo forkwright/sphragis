@@ -31,9 +31,11 @@
 //! encaps/decaps, `derive_wrap_key`) is reachable only with the `hazmat`
 //! feature, for known-answer/conformance testing — no stability promise,
 //! and no migration promise: `DECISION.md` records why the local X-Wing
-//! combiner exists (upstream is pre-release) and what gates swapping it for
-//! a stable, audited upstream implementation. That swap changes
-//! `src/hybrid.rs` alone; this profile's API and wire contract do not move.
+//! combiner remains the immutable review target even though upstream is now
+//! published, and what gates swapping it for an independently reviewed
+//! implementation. A swap stays behind the `src/hybrid.rs` API seam, but its
+//! exact dependency graph, provenance lock, and key hygiene also require
+//! migration review; this profile's API and wire contract do not move.
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(missing_docs)]

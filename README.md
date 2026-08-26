@@ -105,4 +105,4 @@ Full rationale: [`DECISION.md`](DECISION.md).
 
 ## License
 
-AGPL-3.0-only. See [`LICENSE`](LICENSE).
+PolyForm Noncommercial License 1.0.0. See [`LICENSE`](LICENSE).

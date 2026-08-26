@@ -2,7 +2,7 @@
 
 Status: adopted — extracted to standalone repo `forkwright/sphragis`
 Trigger: akroasis #131 (multi-device content-key wrapping for the offline reference store)
-Scope: fleet-wide capability; first consumer akroasis (`pinax` reference store + `kryphos` vault)
+Scope: fleet-wide capability; intended future integration is akroasis's reference-store layer, which does not yet consume this crate
 
 ## TL;DR
 
@@ -186,13 +186,14 @@ the crate is over public values (`RecipientId` is the BLAKE3 hash of a public
 encapsulation key, carried in plaintext on the wire), or is the Poly1305 tag
 check inside `chacha20poly1305`, which already uses `subtle` internally.
 
-Deliberately NOT the `x-wing` crate (0.1.0-rc.0): it pins a *release-candidate*
-stack (`ml-kem 0.3.0-rc.0`, `x25519-dalek 3.0.0-pre.6`, `sha3 0.11.0-rc.7`) and
-would pull a second, duplicate major of `x25519-dalek` alongside the workspace's
-stable 2.0.1. We transcribe the ~15-line X-Wing combiner over the *released*
-primitives and gate it on X-Wing's own published KAT — correctness is proven by
-the vector, and the trusted-compute base stays on shipped crates. `x-wing` is the
-migration target once it reaches a stable release and an audit.
+RustCrypto publishes `x-wing` 0.1.0, but its own
+[security warning](https://docs.rs/x-wing/0.1.0/x_wing/#%E2%9A%A0%EF%B8%8F-security-warning)
+says the crate has never been independently audited. The current local adapter
+and exact resolved provider graph therefore remain the immutable review target
+for sphragis#43. Publication neither satisfies that review nor blocks review of
+the current provider. Provider migration remains separate in sphragis#62; any
+future swap needs its own review of the exact new graph, wire contract, KATs,
+provenance lock, and key hygiene.
 
 `rand_core` coexistence: this crate's injectable-entropy seams take a
 `rand_core` 0.6 handle and use it only to fill byte buffers it owns
@@ -264,21 +265,22 @@ rustls use the word "hazmat" for.
 a raw KEM operation; `src/seal.rs` calls it exclusively through
 `EncapsulationKey`/`DecapsulationKey`'s key-management surface plus the
 crate-private `generate`/`encapsulate`/`decapsulate`/`derive_wrap_key` paths.
-Swapping the local X-Wing combiner (§6) for a stable, audited upstream
-implementation is therefore a change to `src/hybrid.rs` alone: the
+A provider swap stays behind the `src/hybrid.rs` seam, so the
 `EncapsulationKey`/`DecapsulationKey` wire forms (`ENCAPSULATION_KEY_LEN`,
 `CIPHERTEXT_LEN`, `DECAPSULATION_KEY_LEN`), `seal.rs`'s call shapes, and the
-`seal_for`/`unseal`/`generate_recipient_keypair` public API do not move.
+`seal_for`/`unseal`/`generate_recipient_keypair` public API need not move. It
+is not a one-file review: the manifest, lockfile, provenance lock, and key
+hygiene of the exact resolved graph are part of the migration scope.
 
-**What this decision does not do.** It does not perform the migration §6
-already names as the target — upstream `x-wing` is still a release-candidate
-stack (§6), and building the seam does not make a pre-release dependency
-production-grade. The gate for the actual swap is unchanged from §6: a
-stable, audited upstream X-Wing release, whose keypair/ciphertext/shared-secret
-KATs are byte-identical to the vectors this repo already pins (a `v1`-wire
-adapter, not a `v2` construction) — otherwise it is a new version, not a
-drop-in. Until that gate is met, `src/hybrid.rs`'s transcription remains the
-implementation and `hazmat` remains the only way to reach it directly.
+**What this decision does not do.** It does not migrate to the published
+upstream `x-wing` crate. Publication alone does not satisfy this repository's
+review boundary: upstream explicitly remains unaudited. Any swap must prove
+that the keypair/ciphertext/shared-secret behavior is byte-identical to the
+vectors this repository pins, preserve the `v1` wire contract and key hygiene,
+and receive the same qualified review against its exact resolved graph.
+Otherwise it is a new construction version, not a drop-in. Until then,
+`src/hybrid.rs` remains the implementation and `hazmat` remains the only way
+to reach its primitive surface directly.
 
 ## 10. Entropy failures are typed, not panics (#16)
 
