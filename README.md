@@ -84,9 +84,14 @@ own operation against their own store. See `src/rotate.rs`'s module doc and
 
 ## Testing
 
+Producer-side full KAT/conformance profile (not a consumer feature set):
+
 ```sh
-cargo test --features preview-pq
+cargo test --features preview-pq,hazmat
 ```
+
+Normal consumers continue to enable only `preview-pq`, as shown above;
+`hazmat` exists solely to expose the producer's conformance seams.
 
 [`crypto-provenance.toml`](crypto-provenance.toml) declares every
 known-answer test's standard revision, vector source, source hash, and
