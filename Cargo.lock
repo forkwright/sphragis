@@ -794,7 +794,7 @@ dependencies = [
 
 [[package]]
 name = "sphragis"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "blake3",
  "chacha20poly1305",

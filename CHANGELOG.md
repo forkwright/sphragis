@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.3](https://github.com/forkwright/sphragis/compare/v0.2.2...v0.2.3) (2026-08-26)
+
+
+### Bug Fixes
+
+* **ci:** name the real major on the checkout pin ([#65](https://github.com/forkwright/sphragis/issues/65)) ([113e08c](https://github.com/forkwright/sphragis/commit/113e08cfe87e3ef90b0caa7b7e4ceee6d6587518))
+* **sphragis:** correct verification authority ([#69](https://github.com/forkwright/sphragis/issues/69)) ([ce0bcf6](https://github.com/forkwright/sphragis/commit/ce0bcf682fc1867d38e664323cc7761d057b3c7a))
+* **sphragis:** tighten license policy ([#68](https://github.com/forkwright/sphragis/issues/68)) ([311a5c4](https://github.com/forkwright/sphragis/commit/311a5c4515fea6945c5f6fda66964415c6530ab1))
+
 ## [0.2.2](https://github.com/forkwright/sphragis/compare/v0.2.1...v0.2.2) (2026-08-16)
 
 
