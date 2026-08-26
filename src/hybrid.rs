@@ -15,7 +15,7 @@
 //! always-public identity types [`crate::seal::seal_for`]/
 //! [`crate::seal::unseal`] operate on; everything that performs a raw KEM
 //! operation on them (`HybridKem`, `SharedSecret`, direct encaps/decaps) is
-//! reachable only with the `hazmat` feature. RustCrypto publishes `x-wing`
+//! reachable only with the `hazmat` feature. `RustCrypto` publishes `x-wing`
 //! 0.1.0, but its security warning says it has never been independently
 //! audited. This module and the exact resolved provider graph remain the
 //! current review target. A future migration stays behind this seam, but its
