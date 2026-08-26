@@ -19,11 +19,10 @@
 # this repo's workflows today, so this is a net-new check, not the
 # retirement of an existing pattern.
 #
-# WHY these with: values (cite): .github/workflows/ci.yml (fmt/check/clippy/
-# test jobs) + .kanon-ci.toml (forge pipeline, same commands +jobs 8 which we
-# drop — GH-hosted ubuntu-latest runners are already core-capped, the 8-job
-# ceiling in .kanon-ci.toml exists only to protect menos from concurrent-
-# build OOM per that file's own WHY comment, not applicable here).
+# WHY these with: values (cite): .github/workflows/ci.yml owns the complete
+# default / preview-pq / preview-pq+hazmat matrix. .kanon-ci.toml independently
+# runs only the most-permissive preview-pq+hazmat profile with a jobs-8 host cap;
+# it is not command-equivalent to this public gate.
 #
 # DISCREPANCY: sphragis is a single [package], not a [workspace] — no
 # --workspace flag on any stage. ci.yml runs check/clippy/test for default,
@@ -80,11 +79,11 @@ permissions:
 
 jobs:
   gate:
-    # WHY @main, not a pinned SHA: forkwright/.github publishes no tags, so a
-    # SHA pin here has no dependabot bump path and just freezes. forkwright/
-    # .github is first-party -- same org, same trust boundary -- not the
-    # third-party supply-chain case a SHA pin defends against. A floating ref
-    # can't go stale.
+    # WARNING(kanon#3712): @main is the current fleet rollout because
+    # forkwright/.github has no promoted release or consumer updater. It remains
+    # a mutable execution boundary; run receipts expose the resolved SHA but do
+    # not make the call immutable. A coordinated promotion/pin wave owns the
+    # systemic correction, so do not ad-hoc pin this caller.
     uses: forkwright/.github/.github/workflows/hybrid-gate.yml@main
     with:
       fmt_cmd: "cargo fmt --all -- --check"

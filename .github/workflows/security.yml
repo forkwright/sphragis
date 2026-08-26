@@ -30,9 +30,10 @@ env:
 jobs:
   cargo-deny:
     # WHY: checks licenses, banned crates, source registries, and the
-    # RustSec advisory DB using deny.toml ignore list. Any finding fails
-    # the job -- suppressions require a deny.toml entry with a WHY comment,
-    # not silent --ignore flags.
+    # RustSec advisory DB using deny.toml. Policy errors fail the job;
+    # `unused-allowed-license = "deny"` promotes stale license allowances
+    # from cargo-deny's default warning to an error. Suppressions require a
+    # deny.toml entry with a WHY comment, not silent --ignore flags.
     name: cargo deny
     runs-on: ubuntu-latest
     timeout-minutes: 15
