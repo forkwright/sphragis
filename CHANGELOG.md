@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.4](https://github.com/forkwright/sphragis/compare/v0.2.3...v0.2.4) (2026-09-12)
+
+
+### Bug Fixes
+
+* **deps:** update der to unyank cargo audit ([#76](https://github.com/forkwright/sphragis/issues/76)) ([51b1e2e](https://github.com/forkwright/sphragis/commit/51b1e2ea4087519bb05ba9c13b9aa3f0e0487136)), closes [#75](https://github.com/forkwright/sphragis/issues/75)
+
 ## [0.2.3](https://github.com/forkwright/sphragis/compare/v0.2.2...v0.2.3) (2026-08-26)
 
 
